@@ -1,5 +1,5 @@
 module EventMachine
-  module ImapConnection
+  module Imap
     # Intercepts the receive_data event and generates receive_response events
     # with parsed data.
     module ResponseParser

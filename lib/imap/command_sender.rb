@@ -1,5 +1,5 @@
 module EventMachine
-  module ImapConnection
+  module Imap
     # Provides a send_command_object method that serializes command objects
     # and uses send_data on them. This is the ugly sister to ResponseParser.
     module CommandSender
