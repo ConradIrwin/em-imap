@@ -68,9 +68,9 @@ module EventMachine
     def complete_response(command, response)
       case response.name
       when "NO"
-        command.fail Net::IMAP::NoResponseError, response.data.text
+        command.fail Net::IMAP::NoResponseError.new(response.data.text)
       when "BAD"
-        command.fail Net::IMAP::BadResponseError, response.data.text
+        command.fail Net::IMAP::BadResponseError.new(response.data.text)
       else
         command.succeed response, @named_responses.delete(command.cmd)
       end
@@ -128,7 +128,7 @@ module EventMachine
       end
 
       def receive_data(data)
-        print "S: #{data.inspect}"
+        puts "S: #{data.inspect}"
         super
       end
     end
