@@ -64,7 +64,7 @@ module EventMachine
           end
 
         when Net::IMAP::ContinuationRequest
-          if @awaiting_continuation
+          if awaiting_continuation?
             @awaiting_continuation.call response
           else
             fail_all Net::IMAP::ResponseParseError.new(response.raw_data)
@@ -112,6 +112,10 @@ module EventMachine
         end
       end
 
+      def awaiting_continuation?
+        !!@awaiting_continuation
+      end
+
       # Provides a next_tag! method to generate unique tags
       # for an Imap session.
       module TagSequence
@@ -140,15 +144,6 @@ module EventMachine
           puts "S: #{data.inspect}"
           super
         end
-      end
-
-      class Command < Struct.new(:tag, :cmd, :args)
-        include EventMachine::Deferrable
-      end
-      DG.enhance! Command
-
-      class EnhancedDeferrable < DefaultDeferrable
-        DG.enhance! self
       end
 
       include Imap::CommandSender

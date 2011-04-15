@@ -1,18 +1,10 @@
-require 'rubygems'
-require 'lib/imap_connection.rb'
-require 'em/connection.rb'
+require 'spec_helper'
 
-# FIXME: This must already exist...
-class EMStub
-  def initialize; post_init; end
-  def post_init; end
-end
-
-describe EventMachine::ImapConnection::ResponseParser do
+describe EventMachine::Imap::ResponseParser do
 
   before :each do 
     @response_parser = Class.new(EMStub) do 
-      include EventMachine::ImapConnection::ResponseParser 
+      include EventMachine::Imap::ResponseParser 
     end.new
   end
 

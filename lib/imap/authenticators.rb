@@ -15,7 +15,7 @@ module EventMachine
       private
 
       def authenticator(type, *args)
-        raise ArgumentError "Unknown auth type - '#{type}'" unless imap_authenticators[type]
+        raise ArgumentError, "Unknown auth type - '#{type}'" unless imap_authenticators[type]
         imap_authenticators[type].new(*args)
       end
 

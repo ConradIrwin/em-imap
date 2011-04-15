@@ -20,5 +20,14 @@ module EventMachine
       conn.start_tls if ssl
       Client.new(conn)
     end
+
+    class Command < Struct.new(:tag, :cmd, :args)
+      include EventMachine::Deferrable
+      DG.enhance! self
+    end
+
+    class EnhancedDeferrable < DefaultDeferrable
+      DG.enhance! self
+    end
   end
 end
