@@ -37,11 +37,10 @@ module EventMachine
 
       def await_continuations(&block)
         if @awaiting_continuation
-          fail_all RuntimeError.new("Tried to stop awaiting with a block that wasn't waiting...")
+          fail_all RuntimeError.new("Two things tried awaiting...")
         else
-          @awaiting_continuation = block
+          @awaiting_continuation = Continuation.new(block).bothback{ @awaiting_continuation = nil }
         end
-        EnhancedDeferrable.new.bothback{ @awaiting_continuation = nil }
       end
 
       # See also Net::IMAP#receive_responses
@@ -65,7 +64,7 @@ module EventMachine
 
         when Net::IMAP::ContinuationRequest
           if awaiting_continuation?
-            @awaiting_continuation.call response
+            @awaiting_continuation.block.call response
           else
             fail_all Net::IMAP::ResponseParseError.new(response.raw_data)
           end
@@ -104,6 +103,7 @@ module EventMachine
         @tagged_commands.values.each do |command|
           command.fail error
         end
+        raise error
       end
 
       def unbind

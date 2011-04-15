@@ -9,39 +9,28 @@ module EventMachine
         def initialize(command, imap_connection)
           @command = command
           @connection = imap_connection
-
-          @send_buffer = ""
         end
 
-        # Line-buffered sending ftw. (Sends all the complete lines that are available)
         def put_string(str)
-          @send_buffer += str
-
-          eol = @send_buffer.rindex(CRLF)
-          if eol
-            to_send = @send_buffer.slice! 0, eol + CRLF.size
-            @connection.send_data to_send
-          end
-        rescue => e
-          @command.fail e
+          @connection.send_string str, @command
         end
 
-        # This is a translation of Net::Imap#send_literal.
-        # Before the client sends a literal to the server, we have to wait for its permission
-        # (using a ContinuationRequestListener)
         def send_literal(str)
-          raise "Sending a string containing a newline doesn't work yet, syntactic rewriting must happen"
-          put_string("{" + str.size.to_s + "}" + CRLF)
-          @connection.add_listener(ContinuationRequestListener.new(@connection)).callback do
-            put_string(str)
-          end.errback do |exception|
-            @command.fail exception
-          end
+          @connection.send_literal str, @command
         end
 
         public :send_data
       end
 
+      def post_init
+        @send_buffer = ""
+      end
+
+      # This is a method that synchronously converts the command into fragments
+      # of string.
+      #
+      # If you pass something that cannot be serialized, an exception will be raised.
+      # If however, something fails at the socket level, the command will be failed.
       def send_command_object(command)
         sender = FakeNetImap.new(command, self)
 
@@ -51,19 +40,84 @@ module EventMachine
           sender.send_data arg
         end
         sender.put_string CRLF
-      rescue => e
-        command.fail e
       end
 
       # See Net::IMAP#authenticate
       def send_authentication_data(auth_handler, command)
-        waiter = await_continuations do |response|
-          data = auth_handler.process(response.data.text.unpack("m")[0])
-          s = [data].pack("m").gsub(/\n/, "")
-          send_data(s + CRLF)
+        when_not_awaiting_continuation do
+          waiter = await_continuations do |response|
+            begin
+              data = auth_handler.process(response.data.text.unpack("m")[0])
+              s = [data].pack("m").gsub(/\n/, "")
+              send_data(s + CRLF)
+            rescue => e
+              command.fail e
+            end
+          end
+          command.bothback{ |*args| waiter.succeed }
         end
-        command.bothback{ |*args| waiter.succeed }
       end
+
+      def send_string(str, command)
+        when_not_awaiting_continuation do
+          begin
+            send_fragment str
+          rescue
+            command.fail e
+          end
+        end
+      end
+
+      def send_literal(literal, command)
+        when_not_awaiting_continuation do
+          begin
+            send_fragment "{" + literal.size.to_s + "}" + CRLF
+          rescue => e
+            command.fail e
+          end
+          waiter = await_continuations do
+            begin
+              send_data literal
+            rescue => e
+              command.fail e
+            end
+            waiter.succeed
+          end
+          command.errback{ waiter.fail } 
+        end
+      end
+
+      # Each fragment is re-assembled into a full line before we send it to
+      # the remote server.
+      #
+      # This works as all commands end with \r\n, and the encoding of a literal
+      # sends a \r\n before the body of the literal.
+      def send_fragment(str)
+        @send_buffer += str
+        while eol = @send_buffer.index(CRLF)
+          to_send = @send_buffer.slice! 0, eol + CRLF.size
+          send_data to_send
+        end
+      end
+
+
+      # When we're waiting for a continuation response from the server, we must not
+      # send any more data lest we confuse it mightily.
+      #
+      # To this end, this method will hold any pending writes in a queue until the
+      # continuation response has been received and responded to.
+      #
+      # We're using the facts that deferrable callbacks fire in the order that they
+      # were added to the deferrable and that any continuation response can be dealt
+      # with synchronously.
+      def when_not_awaiting_continuation(&block)
+        if awaiting_continuation?
+          @awaiting_continuation.bothback{ when_not_awaiting_continuation(&block) }
+        else
+          yield
+        end
+      end
+
     end
   end
 end

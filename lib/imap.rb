@@ -26,7 +26,8 @@ module EventMachine
       DG.enhance! self
     end
 
-    class EnhancedDeferrable < DefaultDeferrable
+    class Continuation < Struct.new(:block)
+      include EventMachine::Deferrable
       DG.enhance! self
     end
   end
