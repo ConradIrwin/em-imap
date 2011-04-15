@@ -5,7 +5,6 @@ module EventMachine
     module ResponseParser
       def post_init
         super
-        # TODO: Add support for X-GM-THRID and X-GM-MSGID etc.
         @parser = Net::IMAP::ResponseParser.new
         @buffer = ""
       end

@@ -1,6 +1,8 @@
 module EventMachine
   module Imap
     class Client
+      include Imap::Authenticators
+
       def initialize(connection)
         @connection = connection
       end
@@ -9,7 +11,7 @@ module EventMachine
         @connection.close_connection
       end
 
-      ## 6.1 Client commands - any state.
+      ## 6.1 Client Commands - Any State.
 
       def capability
         one_data_response("CAPABILITY")
@@ -32,7 +34,7 @@ module EventMachine
         end
       end
 
-      ## 6.2 Client commands - "Not authenticated" state
+      ## 6.2 Client Commands - Not Authenticated State
 
       def starttls
         raise NotImplementedError
@@ -40,40 +42,61 @@ module EventMachine
 
       def authenticate(auth_type, *args)
         auth_type = auth_type.upcase
-        raise "bleargh"
-      end
+        auth_handler = authenticator(auth_type, *args)
 
-
-      def create(mailbox)
-        tagged_response("CREATE")
-      end
-
-      def delete(mailbox)
-        tagged_response("DELETE")
-      end
-
-      def examine(mailbox)
-        tagged_response("EXAMINE")
+        tagged_response('AUTHENTICATE', auth_type).tap do |command|
+          @connection.send_authentication_data(auth_handler, command)
+        end
       end
 
       def login(username, password)
         tagged_response("LOGIN", username, password)
       end
 
-      def logout
-        tagged_response("LOGOUT")
-      end
+      ## 6.3 Client Commands - Authenticated State
 
+      # TODO: Figure out API for EXISTS, RECENT, etc.
       def select(mailbox)
         tagged_response("SELECT", mailbox)
       end
 
-      def subscribe(mailbox)
-        send_command("SUBSCRIBE", mailbox)
+      def examine(mailbox)
+        tagged_response("EXAMINE", mailbox)
+      end
+
+      def create(mailbox)
+        tagged_response("CREATE", mailbox)
+      end
+
+      def delete(mailbox)
+        tagged_response("DELETE", mailbox)
       end
 
       def rename(mailbox, newname)
         tagged_response("RENAME", mailbox, newname)
+      end
+
+      def subscribe(mailbox)
+        tagged_response("SUBSCRIBE", mailbox)
+      end
+
+      def unsubscribe(mailbox)
+        tagged_response("UNSUBSCRIBE", mailbox)
+      end
+
+      def list(refname, mailbox)
+        multi_data_response("LIST", refname, mailbox)
+      end
+
+      def lsub(refname, mailbox)
+        multi_data_response("LSUB", rename, mailbox)
+      end
+
+      def status(mailbox, attr)
+        # FIXME: Why is this transform needed?
+        one_data_response("STATUS", mailbox, attr).transform do |response|
+          response.attr
+        end
       end
 
       private

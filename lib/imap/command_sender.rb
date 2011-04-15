@@ -54,6 +54,16 @@ module EventMachine
       rescue => e
         command.fail e
       end
+
+      # See Net::IMAP#authenticate
+      def send_authentication_data(auth_handler, command)
+        waiter = await_continuations do |response|
+          data = auth_handler.process(response.data.text.unpack("m")[0])
+          s = [data].pack("m").gsub(/\n/, "")
+          send_data(s + CRLF)
+        end
+        command.bothback{ |*args| waiter.succeed }
+      end
     end
   end
 end

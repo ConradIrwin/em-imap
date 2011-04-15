@@ -17,8 +17,10 @@ module EventMachine
         super
         @tagged_commands = {}
         @named_responses = {}
+        @awaiting_continuation = nil
       end
 
+      # TODO: This should block while we're awaiting continuation.
       def send_command(cmd, *args)
         Command.new(next_tag!, cmd, args).tap do |command|
 
@@ -31,6 +33,15 @@ module EventMachine
         end
       rescue => e
         fail_all e
+      end
+
+      def await_continuations(&block)
+        if @awaiting_continuation
+          fail_all RuntimeError.new("Tried to stop awaiting with a block that wasn't waiting...")
+        else
+          @awaiting_continuation = block
+        end
+        EnhancedDeferrable.new.bothback{ @awaiting_continuation = nil }
       end
 
       # See also Net::IMAP#receive_responses
@@ -46,15 +57,18 @@ module EventMachine
           end
 
         when Net::IMAP::UntaggedResponse
-          if response.name == "BYE" # && @logout_command_tag.nil?
+          if response.name == "BYE"
             fail_all Net::IMAP::ByeResponseError.new(response.raw_data)
           else
             record_response(response.name, response.data)
           end
 
         when Net::IMAP::ContinuationRequest
-          # TODO
-
+          if @awaiting_continuation
+            @awaiting_continuation.call response
+          else
+            fail_all Net::IMAP::ResponseParseError.new(response.raw_data)
+          end
         end
       rescue => e
         fail_all e
@@ -90,7 +104,6 @@ module EventMachine
         @tagged_commands.values.each do |command|
           command.fail error
         end
-        raise error
       end
 
       def unbind
@@ -133,6 +146,10 @@ module EventMachine
         include EventMachine::Deferrable
       end
       DG.enhance! Command
+
+      class EnhancedDeferrable < DefaultDeferrable
+        DG.enhance! self
+      end
 
       include Imap::CommandSender
       include Imap::ResponseParser

@@ -8,6 +8,8 @@ $:.unshift File.dirname( __FILE__ )
 require 'imap/command_sender'
 require 'imap/response_parser'
 require 'imap/connection'
+
+require 'imap/authenticators'
 require 'imap/client'
 $:.shift
 
