@@ -99,6 +99,32 @@ module EventMachine
         end
       end
 
+      def append(mailbox, message, flags=nil, date_time=nil)
+        args = [mailbox]
+        args << flags if flags
+        args << date_time if date_time
+        args << Net::IMAP::Literal.new(message)
+        tagged_response("APPEND" *args)
+      end
+
+      # 6.4 Client Commands - Selected State
+      
+      def check
+        tagged_response("CHECK")
+      end
+
+      def close
+        tagged_response("CLOSE")
+      end
+      
+      def expunge
+        tagged_response("EXPUNGE")
+      end
+
+      def search(keys, charset)
+
+      end
+
       private
       
       # The callback of a Command returns both a tagged response,

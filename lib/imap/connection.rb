@@ -17,10 +17,8 @@ module EventMachine
         super
         @tagged_commands = {}
         @named_responses = {}
-        @awaiting_continuation = nil
       end
 
-      # TODO: This should block while we're awaiting continuation.
       def send_command(cmd, *args)
         Command.new(next_tag!, cmd, args).tap do |command|
 
@@ -33,14 +31,6 @@ module EventMachine
         end
       rescue => e
         fail_all e
-      end
-
-      def await_continuations(&block)
-        if @awaiting_continuation
-          fail_all RuntimeError.new("Two things tried awaiting...")
-        else
-          @awaiting_continuation = Continuation.new(block).bothback{ @awaiting_continuation = nil }
-        end
       end
 
       # See also Net::IMAP#receive_responses
@@ -63,11 +53,8 @@ module EventMachine
           end
 
         when Net::IMAP::ContinuationRequest
-          if awaiting_continuation?
-            @awaiting_continuation.block.call response
-          else
-            fail_all Net::IMAP::ResponseParseError.new(response.raw_data)
-          end
+          receive_continuation response
+
         end
       rescue => e
         fail_all e
@@ -110,10 +97,6 @@ module EventMachine
         unless @tagged_commands.empty?
           fail_all EOFError.new("end of file reached")
         end
-      end
-
-      def awaiting_continuation?
-        !!@awaiting_continuation
       end
 
       # Provides a next_tag! method to generate unique tags

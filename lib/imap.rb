@@ -26,7 +26,7 @@ module EventMachine
       DG.enhance! self
     end
 
-    class Continuation < Struct.new(:block)
+    class ContinuationWaiter < Struct.new(:block)
       include EventMachine::Deferrable
       DG.enhance! self
     end
