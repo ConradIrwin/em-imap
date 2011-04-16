@@ -5,6 +5,7 @@ require 'eventmachine'
 require 'deferrable_gratification'
 
 $:.unshift File.dirname( __FILE__ )
+require 'imap/continuation_synchronisation'
 require 'imap/command_sender'
 require 'imap/response_parser'
 require 'imap/connection'

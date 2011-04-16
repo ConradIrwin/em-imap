@@ -24,6 +24,7 @@ module EventMachine
     # to block the outbound link while waiting for the continuation
     # responses that it is expecting.
     #
+    # TODO: This synchronisation mehcanism ought to be available standalone...
     module ContinuationSynchronisation
 
       def post_init
@@ -31,10 +32,14 @@ module EventMachine
         @awaiting_continuation = nil
       end
 
-      # Pass all continuation responses to the block until further notice.
+      def awaiting_continuation?
+        !!@awaiting_continuation
+      end
+
+      # Pass all continuation responses to the block.
       #
-      # Returns a deferrable which you should succeed or fail when you have
-      # received all the continuations you need.
+      # Returns a deferrable which you should succeed when you have
+      # received all the necessary continuations.
       def await_continuations(&block)
         ContinuationWaiter.new(block).tap do |waiter|
           when_not_awaiting_continuation do
@@ -58,17 +63,15 @@ module EventMachine
       # If possible, the block will be executed immediately; if not it will
       # be added to a queue and executed whenever the queue has been emptied.
       #
-      # Any previous items in the queue that wait on the connection will 
+      # Note that if a queued callback retakes the synchronisation lock then
+      # all the later callbacks will be tranferred to the new queue.
+      #
       def when_not_awaiting_continuation(&block)
         if awaiting_continuation?
           @awaiting_continuation.bothback{ when_not_awaiting_continuation(&block) }
         else
           yield
         end
-      end
-
-      def awaiting_continuation?
-        !!@awaiting_continuation
       end
     end
   end
