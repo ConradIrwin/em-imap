@@ -90,7 +90,7 @@ module EventMachine
         @tagged_commands.values.each do |command|
           command.fail error
         end
-        raise error
+#        raise error
       end
 
       def unbind

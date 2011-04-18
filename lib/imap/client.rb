@@ -1,5 +1,6 @@
 module EventMachine
   module Imap
+    # TODO: Anything that accepts or returns a mailbox name should have UTF7 support.
     class Client
       include Imap::Authenticators
 
@@ -84,7 +85,7 @@ module EventMachine
         tagged_response("UNSUBSCRIBE", mailbox)
       end
 
-      def list(refname, mailbox)
+      def list(refname="", mailbox="*")
         multi_data_response("LIST", refname, mailbox)
       end
 
@@ -121,9 +122,43 @@ module EventMachine
         tagged_response("EXPUNGE")
       end
 
-      def search(keys, charset)
+      def search(keys, charset=nil)
+        search_internal(["SEARCH"], keys, charset)
+      end
+
+      def uid_search(keys, charset=nil)
+        search_internal(["UID SEARCH"], keys, charset)
+      end
+
+      # SORT and THREAD (like SEARCH) from http://tools.ietf.org/search/rfc5256
+      def sort(sort_keys, search_keys, charset=nil)
+        search_internal(["SORT", sort_keys], search_keys, charset)
+      end
+
+      def uid_sort
+        search_internal(["UID SORT", sort_keys], search_keys, charset)
+      end
+
+      def thread(algorithm, search_keys, charset=nil)
+        search_internal(["THREAD", algorithm], search_keys, charset)
+      end
+
+      def uid_thread
+        search_internal(["UID THREAD", algorithm], search_keys, charset)
+      end
+
+      def fetch(seq, attr)
+        fetch_internal("FETCH", seq, attr)
+      end
+
+      def uid_fetch(seq, attr)
+        fetch_internal("UID FETCH", seq, attr)
+      end
+
+      def store(seq, name, value)
 
       end
+
 
       private
       
@@ -144,6 +179,52 @@ module EventMachine
 
       def send_command(cmd, *args)
         @connection.send_command(cmd, *args)
+      end
+
+      # From Net::IMAP
+      def fetch_internal(cmd, set, attr)
+        case attr
+        when String then
+          attr = RawData.new(attr)
+        when Array then
+          attr = attr.map { |arg|
+            arg.is_a?(String) ? RawData.new(arg) : arg
+          }
+        end
+
+        multi_data_response(cmd)
+      end
+
+      def store_internal(cmd, set, attr, flags)
+        if attr.instance_of?(String)
+          attr = RawData.new(attr)
+        end
+      end
+
+      # From Net::IMAP
+      def search_internal(command, keys, charset)
+        if keys.instance_of?(String)
+          keys = [Net::IMAP::RawData.new(keys)]
+        else
+          normalize_searching_criteria(keys)
+        end
+        if charset
+          one_data_response *(command + ["CHARSET", charset] + keys)
+        else
+          one_data_response *(command + keys)
+        end
+      end
+
+      # From Net::IMAP
+      def normalize_searching_criteria(keys)
+        keys.collect! do |i|
+          case i
+          when -1, Range, Array
+            Net::IMAP::MessageSet.new(i)
+          else
+            i
+          end
+        end
       end
     end
   end

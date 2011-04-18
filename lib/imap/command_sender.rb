@@ -40,16 +40,18 @@ module EventMachine
 
       # See Net::IMAP#authenticate
       def send_authentication_data(auth_handler, command)
-        waiter = await_continuations do |response|
-          begin
-            data = auth_handler.process(response.data.text.unpack("m")[0])
-            s = [data].pack("m").gsub(/\n/, "")
-            send_data(s + CRLF)
-          rescue => e
-            command.fail e
+        when_not_awaiting_continuation do
+          waiter = await_continuations do |response|
+            begin
+              data = auth_handler.process(response.data.text.unpack("m")[0])
+              s = [data].pack("m").gsub(/\n/, "")
+              send_data(s + CRLF)
+            rescue => e
+              command.fail e
+            end
           end
+          command.bothback{ |*args| waiter.succeed }
         end
-        command.bothback{ |*args| waiter.succeed }
       end
 
       def send_string(str, command)
@@ -89,6 +91,7 @@ module EventMachine
 
         def send_line_buffered(str)
           @line_buffer += str
+          puts @line_buffer;
           while eol = @line_buffer.index(CRLF)
             to_send = @line_buffer.slice! 0, eol + CRLF.size
             send_data to_send
