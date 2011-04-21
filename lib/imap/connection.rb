@@ -16,7 +16,12 @@ module EventMachine
       def post_init
         super
         @tagged_commands = {}
-        @named_responses = {}
+        @untagged_responses = {}
+        @listeners = []
+      end
+
+      def untagged_responses
+        @untagged_responses
       end
 
       def send_command(cmd, *args)
@@ -49,7 +54,7 @@ module EventMachine
           if response.name == "BYE"
             fail_all Net::IMAP::ByeResponseError.new(response.raw_data)
           else
-            record_response(response.name, response.data)
+            receive_untagged(response)
           end
 
         when Net::IMAP::ContinuationRequest
@@ -68,14 +73,27 @@ module EventMachine
         when "BAD"
           command.fail Net::IMAP::BadResponseError.new(response.data.text)
         else
-          command.succeed response, @named_responses.delete(command.cmd)
+          command.succeed response, @untagged_responses.delete(command.cmd)
+        end
+      end
+
+      def add_response_handler(&block)
+        ContinuationWaiter.new(&block).tap do |listener|
+          @listeners << listener.bothback{ @listeners.delete listener }
+        end
+      end
+
+      def receive_untagged(response)
+        record_response(response.name, response.data)
+        @untagged_listeners.each do |listener|
+          listener.block.call response
         end
       end
 
       # NOTE: This is a pretty horrible way to do things.
       def record_response(name, response)
-        @named_responses[name] ||= []
-        @named_responses[name] << response
+        @untagged_responses[name] ||= []
+        @untagged_responses[name] << response
       end
 
       def add_to_listener_pool(command)

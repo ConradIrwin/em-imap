@@ -12,6 +12,11 @@ module EventMachine
         @connection.close_connection
       end
 
+      def untagged_responses
+        @connection.untagged_responses
+      end
+      alias :responses :untagged_responses
+
       ## 6.1 Client Commands - Any State.
 
       def capability
@@ -156,25 +161,32 @@ module EventMachine
       end
 
       def store(seq, name, value)
-
+        store_internal("STORE", seq, name, value)
       end
 
+      def uid_store(seq, name, value)
+        store_internal("UID STORE", seq, name, value)
+      end
+
+      def idle(&block)
+        send_idle_command
+      end
 
       private
       
       # The callback of a Command returns both a tagged response,
       # and optionally a list of untagged responses that were
       # generated at the same time.
-      def tagged_response(*command)
-        send_command(*command).transform{ |response, data| response }
+      def tagged_response(cmd, *args)
+        send_command(cmd, *args)
       end
 
-      def one_data_response(*command)
-        send_command(*command).transform{ |response, data| data.last }
+      def one_data_response(cmd, *args)
+        send_command(cmd, *args).transform{ |response| untagged_responses[cmd].pop }
       end
 
       def multi_data_response(*command)
-        send_command(*command).transform{ |response, data| data }
+        send_command(*command).transform{ |response| untagged_responses.delete(cmd) }
       end
 
       def send_command(cmd, *args)
@@ -198,6 +210,9 @@ module EventMachine
       def store_internal(cmd, set, attr, flags)
         if attr.instance_of?(String)
           attr = RawData.new(attr)
+        end
+        send_command(cmd, Net::IMAP::MessageSet.new(set), attr, flags).transform do |response|
+          untagged_responses.delete 'FETCH'
         end
       end
 
