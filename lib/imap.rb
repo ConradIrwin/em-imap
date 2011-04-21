@@ -27,6 +27,19 @@ module EventMachine
       DG.enhance! self
     end
 
+    class IdleCommand < Command
+      def initialize(*args, &block)
+        super(*args)
+        @done = block
+      end
+
+      def done(*args, &block)
+        puts "Doning"
+        @done.call(*args, &block)
+        puts "DONE"
+      end
+    end
+
     class ContinuationWaiter < Struct.new(:block)
       include EventMachine::Deferrable
       DG.enhance! self

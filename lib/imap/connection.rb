@@ -73,11 +73,11 @@ module EventMachine
         when "BAD"
           command.fail Net::IMAP::BadResponseError.new(response.data.text)
         else
-          command.succeed response, @untagged_responses.delete(command.cmd)
+          command.succeed response
         end
       end
 
-      def add_response_handler(&block)
+      def receive_untagged_responses(&block)
         ContinuationWaiter.new(&block).tap do |listener|
           @listeners << listener.bothback{ @listeners.delete listener }
         end
@@ -85,7 +85,7 @@ module EventMachine
 
       def receive_untagged(response)
         record_response(response.name, response.data)
-        @untagged_listeners.each do |listener|
+        @listeners.each do |listener|
           listener.block.call response
         end
       end

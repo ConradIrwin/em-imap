@@ -91,7 +91,6 @@ module EventMachine
 
         def send_line_buffered(str)
           @line_buffer += str
-          puts @line_buffer;
           while eol = @line_buffer.index(CRLF)
             to_send = @line_buffer.slice! 0, eol + CRLF.size
             send_data to_send
