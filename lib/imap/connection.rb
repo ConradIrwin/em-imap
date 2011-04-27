@@ -27,15 +27,19 @@ module EventMachine
       def send_command(cmd, *args)
         Command.new(next_tag!, cmd, args).tap do |command|
 
-          add_to_listener_pool(command)
-          command.bothback do
-            remove_from_listener_pool(command)
-          end
-
           send_command_object(command)
         end
       rescue => e
         fail_all e
+      end
+
+      def send_command_object(command)
+        add_to_listener_pool(command)
+        command.bothback do
+          remove_from_listener_pool(command)
+        end
+
+        super
       end
 
       # See also Net::IMAP#receive_responses
@@ -108,7 +112,7 @@ module EventMachine
         @tagged_commands.values.each do |command|
           command.fail error
         end
-#        raise error
+        raise error unless @tagged_commands.empty?
       end
 
       def unbind

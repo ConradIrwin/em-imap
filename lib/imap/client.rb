@@ -29,14 +29,12 @@ module EventMachine
 
       # Logout and close the connection.
       def logout
-        tagged_response("LOGOUT").errback do |e|
+        command = tagged_response("LOGOUT").errback do |e|
           if e.is_a? Net::IMAP::ByeResponseError
             # RFC 3501 says the server MUST send a BYE response and then close the connection.
             disconnect
-            succeed
+            command.succeed e
           end
-        end.callback do |response|
-          fail Net::IMAP::ResponseParseError.new("Received the wrong response to LOGOUT: #{response}")
         end
       end
 
@@ -184,13 +182,12 @@ module EventMachine
       # EM.timeout(60) { idler.done }
       #
       def idle(&block)
-        command = IdleCommand.new(@connection.next_tag!, "IDLE", []) do
-          @connection.send_data "DONE\r\n"
-        end
-        @connection.send_command_object(command)
-        command.tap do |command|
+        Command.new(@connection.next_tag!, "IDLE", [], &block).tap do |command|
+          @connection.send_command_object command
           waiter = @connection.await_continuations{ }
           listener = receive_untagged_responses(&block)
+
+          command.stopback{ @connection.send_data "DONE\r\n" }
 
           command.bothback do
             puts "BOTHBACK"

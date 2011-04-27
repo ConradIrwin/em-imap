@@ -23,21 +23,13 @@ module EventMachine
       Client.new(conn)
     end
 
-    class Command < Struct.new(:tag, :cmd, :args)
-      include EventMachine::Deferrable
-      DG.enhance! self
-    end
-
-    class IdleCommand < Command
-      def initialize(*args, &block)
-        super(*args)
-        @done = block
-      end
-
-      def done(*args, &block)
-        puts "Doning"
-        @done.call(*args, &block)
-        puts "DONE"
+    class Command < Listener
+      attr_accessor :tag, :cmd, :args
+      def initialize(tag, cmd, args, &block)
+        super(&block)
+        self.tag = tag
+        self.cmd = cmd
+        self.args = args
       end
     end
 
