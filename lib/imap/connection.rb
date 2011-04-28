@@ -24,16 +24,54 @@ module EventMachine
         @untagged_responses
       end
 
-      def send_command(cmd, *args)
-        Command.new(next_tag!, cmd, args).tap do |command|
-
+      def send_command(cmd, *args, &block)
+        Command.new(next_tag!, cmd, args, &block).tap do |command|
           send_command_object(command)
         end
-      rescue => e
-        fail_all e
       end
 
-      def send_command_object(command)
+      # IDLE is a bit different from other commands, in that the client
+      # is supposed to wait between receiving the continuation response
+      # and sending the continuation data, while the server keeps it
+      # up-to-date with unsolicited replies.
+      #
+      # This is dealt with by two Listeners, the command listens for untagged responses,
+      # and forwards them to the caller, while the waiter blocks the outbound connection
+      # so that we can't send further data until this continuation response has been
+      # dealt with.
+      #
+      # The things that happen, in order are:
+      #
+      #   the command starts listening
+      #   the waiter starts listening
+      #
+      #   the server returns an IDLING continuation response (overheard but ignored by the waiter)
+      #   the server returns many untagged responses (overheard by the command and dealt
+      #    with by the caller).
+      #
+      #   the caller calls command.stop
+      #   the command sends DONE to the server
+      #   the command stops listening to replies from the server
+      #   the command calls waiter.stop
+      #   the waiter stops listening to replies from the server,
+      #    and unblocks the outbound connection.
+      #   the server replies with OK
+      #   the command succeeds.
+      #
+      def send_idle_command(&block)
+        Command.new(next_tag!, "IDLE", [], &block).tap do |command|
+          when_not_awaiting_continuation do
+            send_command_object(command)
+            waiter = await_continuations
+            command.stopback do
+              send_data "DONE\r\n"
+              waiter.stop
+            end
+          end
+        end
+      end
+
+      def send_command_object(command, &block)
         add_to_listener_pool(command)
         command.bothback do
           remove_from_listener_pool(command)

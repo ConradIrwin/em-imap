@@ -50,7 +50,7 @@ module EventMachine
               command.fail e
             end
           end
-          command.bothback{ |*args| waiter.succeed }
+          command.bothback{ |*args| waiter.stop }
         end
       end
 
@@ -77,9 +77,9 @@ module EventMachine
             rescue => e
               command.fail e
             end
-            waiter.succeed
+            waiter.stop
           end
-          command.errback{ waiter.fail } 
+          command.errback{ waiter.stop }
         end
       end
 

@@ -169,9 +169,8 @@ module EventMachine
       # The IDLE command allows you to wait for any untagged responses
       # that give status updates about the contents of a mailbox.
       #
-      # Until you call done on the idler, no further commands can be sent
+      # Until you call stop on the idler, no further commands can be sent
       # over this connection.
-      # TODO: Is this the best API...
       #
       # idler = connection.idle do |untagged_response|
       #   case untagged_response.name
@@ -179,22 +178,10 @@ module EventMachine
       #   end
       # end
       #
-      # EM.timeout(60) { idler.done }
+      # EM.timeout(60) { idler.stop }
       #
       def idle(&block)
-        Command.new(@connection.next_tag!, "IDLE", [], &block).tap do |command|
-          @connection.send_command_object command
-          waiter = @connection.await_continuations{ }
-          listener = receive_untagged_responses(&block)
-
-          command.stopback{ @connection.send_data "DONE\r\n" }
-
-          command.bothback do
-            puts "BOTHBACK"
-            waiter.succeed
-            listener.succeed
-          end
-        end
+        @connection.send_idle_command &block
       end
 
       def receive_untagged_responses(&block)
