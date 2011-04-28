@@ -186,8 +186,8 @@ module EventMachine
         end
       end
 
-      def receive_untagged_responses(&block)
-        @connection.receive_untagged_responses(&block)
+      def add_response_handler(&block)
+        @connection.add_response_handler(&block)
       end
 
       private
@@ -200,11 +200,31 @@ module EventMachine
       end
 
       def one_data_response(cmd, *args)
-        send_command(cmd, *args).transform{ |response| untagged_responses[cmd].pop }
+        multi_data_response(cmd, *args).transform do |untagged_responses|
+          untagged_responses.last
+        end
       end
 
-      def multi_data_response(*command)
-        send_command(*command).transform{ |response| untagged_responses.delete(cmd) }
+      def multi_data_response(cmd, *args)
+        collect_untagged_responses(cmd, cmd, *args)
+      end
+
+      def collect_untagged_responses(name, *command)
+        untagged_responses = []
+
+        send_command(*command) do |response|
+          if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == name
+            untagged_responses << response
+
+          # If we observe another tagged response completeing, then we can be
+          # sure that the previous untagged responses were not relevant to this command.
+          elsif response.is_a?(Net::IMAP::TaggedResponse)
+            untagged_responses = []
+
+          end
+        end.transform do |tagged_response|
+          untagged_responses
+        end
       end
 
       def send_command(cmd, *args)
@@ -229,9 +249,7 @@ module EventMachine
         if attr.instance_of?(String)
           attr = RawData.new(attr)
         end
-        send_command(cmd, Net::IMAP::MessageSet.new(set), attr, flags).transform do |response|
-          untagged_responses.delete 'FETCH'
-        end
+        collect_untagged_responses('FETCH', cmd, *args)
       end
 
       # From Net::IMAP

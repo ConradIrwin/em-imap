@@ -30,6 +30,7 @@ module EventMachine
       def post_init
         super
         @awaiting_continuation = nil
+        listen_for_continuation
       end
 
       def awaiting_continuation?
@@ -52,11 +53,15 @@ module EventMachine
       end
 
       # Pass any continuation response to the block that is expecting it.
-      def receive_continuation(response)
-        if awaiting_continuation?
-          @awaiting_continuation.receive_event response
-        else
-          fail_all Net::IMAP::ResponseParseError.new(response.raw_data)
+      def listen_for_continuation
+        add_response_handler do |response|
+          if response.is_a?(Net::IMAP::ContinuationRequest)
+            if awaiting_continuation?
+              @awaiting_continuation.receive_event response
+            else
+              fail Net::IMAP::ResponseParseError.new(response.raw_data)
+            end
+          end
         end
       end
 

@@ -2,7 +2,9 @@ module EventMachine
   module Imap
     CRLF = "\r\n"
     module Connection
-      attr_reader :waiting
+      include ListeningDeferrable
+      include Imap::CommandSender
+      include Imap::ResponseParser
 
       def self.connect(host, port, ssl=false)
         EventMachine.connect(host, port, self).tap do |conn|
@@ -11,10 +13,14 @@ module EventMachine
       end
 
       def post_init
-        super
         @untagged_responses = {}
         @tagged_listeners = {}
         @listeners = []
+        super
+        errback do |e|
+          @listeners.each{ |listener| listener.fail e }
+        end
+        listen_for_bye
       end
 
       def untagged_responses
@@ -24,86 +30,58 @@ module EventMachine
       def send_command(cmd, *args, &block)
         Command.new(next_tag!, cmd, args, &block).tap do |command|
           add_to_listener_pool(command)
+          listen_for_tagged_response(command)
           send_command_object(command)
         end
       end
 
       def add_to_listener_pool(listener)
-        if listener.respond_to(:tag) && listener.tag
-          @tagged_listeners[listener.tag] = listener.bothback{ @tagged_listeners.delete listener.tag }
-        end
         @listeners << listener.bothback{ @listeners.delete listener }
       end
 
-      # See also Net::IMAP#receive_responses
       def receive_response(response)
-        case response
-        when Net::IMAP::TaggedResponse
-
-          if @tagged_commands[response.tag]
-            complete_response @tagged_commands[response.tag], response
-          else
-            # The server has responded to a request we didn't make, let's bail.
-            fail_all Net::IMAP::ResponseParseError.new(response.raw_data)
-          end
-
-        when Net::IMAP::UntaggedResponse
-          if response.name == "BYE"
-            fail_all Net::IMAP::ByeResponseError.new(response.raw_data)
-          else
-            receive_untagged(response)
-          end
-
-        when Net::IMAP::ContinuationRequest
-          receive_continuation response
-
-        end
-      rescue => e
-        fail_all e
+        @listeners.each{ |listener| listener.receive_event response }
       end
 
-      # Net::IMAP#pick_up_tagged_response
-      def complete_response(command, response)
-        case response.name
-        when "NO"
-          command.fail Net::IMAP::NoResponseError.new(response.data.text)
-        when "BAD"
-          command.fail Net::IMAP::BadResponseError.new(response.data.text)
-        else
-          command.succeed response
+      def listen_for_tagged_response(command)
+        command.listen do |response|
+          if response.is_a?(Net::IMAP::TaggedResponse) && response.tag == command.tag
+            case response.name
+            when "NO"
+              command.fail Net::IMAP::NoResponseError.new(response.data.text)
+            when "BAD"
+              command.fail Net::IMAP::BadResponseError.new(response.data.text)
+            else
+              command.succeed response
+            end
+          end
         end
       end
 
-      def receive_untagged_responses(&block)
+      def listen_for_bye
+        add_response_handler do |response|
+          if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == "BYE"
+            if stopped?
+              succeed
+            else
+              fail Net::IMAP::ByeResponseError.new(response.raw_data)
+            end
+          end
+        end
+      end
+
+      def add_response_handler(&block)
         Listener.new(&block).tap do |listener|
           listener.stopback{ listener.succeed }
           add_to_listener_pool(listener)
         end
       end
 
-      def receive_untagged(response)
-        record_response(response.name, response.data)
-        @listeners.each do |listener|
-          listener.receive_event response
-        end
-      end
-
-      # NOTE: This is a pretty horrible way to do things.
-      def record_response(name, response)
-        @untagged_responses[name] ||= []
-        @untagged_responses[name] << response
-      end
-
-      def fail_all(error)
-        @tagged_commands.values.each do |command|
-          command.fail error
-        end
-        raise error unless @tagged_commands.empty?
-      end
-
       def unbind
-        unless @tagged_commands.empty?
-          fail_all EOFError.new("end of file reached")
+        if stopped?
+          succeed
+        else
+          fail EOFError.new("end of file reached")
         end
       end
 
@@ -136,9 +114,6 @@ module EventMachine
           super
         end
       end
-
-      include Imap::CommandSender
-      include Imap::ResponseParser
       include Imap::Connection::TagSequence
       include Imap::Connection::Debug
     end
