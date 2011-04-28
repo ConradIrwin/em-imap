@@ -20,7 +20,7 @@ describe EM::Imap::ContinuationSynchronisation do
     waiter = @connection.await_continuations{ }
     @connection.when_not_awaiting_continuation{ a = true }
     a.should be_false
-    waiter.succeed
+    waiter.stop
     a.should be_true
   end
 
@@ -29,9 +29,9 @@ describe EM::Imap::ContinuationSynchronisation do
     waiter1 = @connection.await_continuations{ }
     waiter2 = @connection.await_continuations{ }
     @connection.when_not_awaiting_continuation{ a = true }
-    waiter1.succeed
+    waiter1.stop
     a.should be_false
-    waiter2.succeed
+    waiter2.stop
     a.should be_true
   end
 
@@ -45,9 +45,9 @@ describe EM::Imap::ContinuationSynchronisation do
     end
 
     @connection.when_not_awaiting_continuation{ a = true }
-    waiter1.succeed
+    waiter1.stop
     a.should be_false
-    waiter2.succeed
+    waiter2.stop
     a.should be_true
   end
 
@@ -75,7 +75,7 @@ describe EM::Imap::ContinuationSynchronisation do
     a = []
     waiter1 = @connection.await_continuations do |response|
       a << response
-      waiter1.succeed
+      waiter1.stop
     end
     waiter2 = @connection.await_continuations{ }
 

@@ -25,17 +25,12 @@ module EventMachine
 
     class Command < Listener
       attr_accessor :tag, :cmd, :args
-      def initialize(tag, cmd, args, &block)
+      def initialize(tag, cmd, args=[], &block)
         super(&block)
         self.tag = tag
         self.cmd = cmd
         self.args = args
       end
-    end
-
-    class ContinuationWaiter < Struct.new(:block)
-      include EventMachine::Deferrable
-      DG.enhance! self
     end
   end
 end

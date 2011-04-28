@@ -41,9 +41,12 @@ module EventMachine
       # Returns a deferrable which you should succeed when you have
       # received all the necessary continuations.
       def await_continuations(&block)
-        ContinuationWaiter.new(block).tap do |waiter|
+        Listener.new(&block).tap do |waiter|
           when_not_awaiting_continuation do
-            @awaiting_continuation = waiter.bothback{ @awaiting_continuation = nil }
+            @awaiting_continuation = waiter.stopback do
+              @awaiting_continuation = nil
+              waiter.succeed
+            end
           end
         end
       end
@@ -51,7 +54,7 @@ module EventMachine
       # Pass any continuation response to the block that is expecting it.
       def receive_continuation(response)
         if awaiting_continuation?
-          @awaiting_continuation.block.call response
+          @awaiting_continuation.receive_event response
         else
           fail_all Net::IMAP::ResponseParseError.new(response.raw_data)
         end
