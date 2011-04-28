@@ -181,7 +181,9 @@ module EventMachine
       # EM.timeout(60) { idler.stop }
       #
       def idle(&block)
-        @connection.send_idle_command &block
+        @connection.send_command("IDLE", &block).tap do |command|
+          @connection.prepare_idle_continuation(command)
+        end
       end
 
       def receive_untagged_responses(&block)

@@ -1,6 +1,3 @@
-require 'net/imap'
-require File.dirname( __FILE__ ) + '/response_parser.rb'
-require File.dirname( __FILE__ ) + '/command_sender.rb'
 module EventMachine
   module Imap
     CRLF = "\r\n"
@@ -15,8 +12,8 @@ module EventMachine
 
       def post_init
         super
-        @tagged_commands = {}
         @untagged_responses = {}
+        @tagged_listeners = {}
         @listeners = []
       end
 
@@ -26,58 +23,16 @@ module EventMachine
 
       def send_command(cmd, *args, &block)
         Command.new(next_tag!, cmd, args, &block).tap do |command|
+          add_to_listener_pool(command)
           send_command_object(command)
         end
       end
 
-      # IDLE is a bit different from other commands, in that the client
-      # is supposed to wait between receiving the continuation response
-      # and sending the continuation data, while the server keeps it
-      # up-to-date with unsolicited replies.
-      #
-      # This is dealt with by two Listeners, the command listens for untagged responses,
-      # and forwards them to the caller, while the waiter blocks the outbound connection
-      # so that we can't send further data until this continuation response has been
-      # dealt with.
-      #
-      # The things that happen, in order are:
-      #
-      #   the command starts listening
-      #   the waiter starts listening
-      #
-      #   the server returns an IDLING continuation response (overheard but ignored by the waiter)
-      #   the server returns many untagged responses (overheard by the command and dealt
-      #    with by the caller).
-      #
-      #   the caller calls command.stop
-      #   the command sends DONE to the server
-      #   the command stops listening to replies from the server
-      #   the command calls waiter.stop
-      #   the waiter stops listening to replies from the server,
-      #    and unblocks the outbound connection.
-      #   the server replies with OK
-      #   the command succeeds.
-      #
-      def send_idle_command(&block)
-        Command.new(next_tag!, "IDLE", [], &block).tap do |command|
-          when_not_awaiting_continuation do
-            send_command_object(command)
-            waiter = await_continuations
-            command.stopback do
-              send_data "DONE\r\n"
-              waiter.stop
-            end
-          end
+      def add_to_listener_pool(listener)
+        if listener.respond_to(:tag) && listener.tag
+          @tagged_listeners[listener.tag] = listener.bothback{ @tagged_listeners.delete listener.tag }
         end
-      end
-
-      def send_command_object(command, &block)
-        add_to_listener_pool(command)
-        command.bothback do
-          remove_from_listener_pool(command)
-        end
-
-        super
+        @listeners << listener.bothback{ @listeners.delete listener }
       end
 
       # See also Net::IMAP#receive_responses
@@ -120,15 +75,16 @@ module EventMachine
       end
 
       def receive_untagged_responses(&block)
-        ContinuationWaiter.new(&block).tap do |listener|
-          @listeners << listener.bothback{ @listeners.delete listener }
+        Listener.new(&block).tap do |listener|
+          listener.stopback{ listener.succeed }
+          add_to_listener_pool(listener)
         end
       end
 
       def receive_untagged(response)
         record_response(response.name, response.data)
         @listeners.each do |listener|
-          listener.block.call response
+          listener.receive_event response
         end
       end
 
@@ -136,14 +92,6 @@ module EventMachine
       def record_response(name, response)
         @untagged_responses[name] ||= []
         @untagged_responses[name] << response
-      end
-
-      def add_to_listener_pool(command)
-        @tagged_commands[command.tag] = command
-      end
-
-      def remove_from_listener_pool(command)
-        @tagged_commands.delete command.tag
       end
 
       def fail_all(error)

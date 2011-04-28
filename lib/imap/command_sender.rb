@@ -54,6 +54,20 @@ module EventMachine
         end
       end
 
+      def prepare_idle_continuation(command)
+        when_not_awaiting_continuation do
+          waiter = await_continuations
+          command.stopback do
+            waiter.stop
+            begin
+              send_data "DONE\r\n"
+            rescue => e
+              command.fail e
+            end
+          end
+        end
+      end
+
       def send_string(str, command)
         when_not_awaiting_continuation do
           begin
