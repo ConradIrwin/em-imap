@@ -1,74 +1,93 @@
 module EventMachine
   module Imap
-    # A Listener is a cancellable subscriber to an event stream, they
-    # are used to provide control-flow abstraction throughout em-imap.
+    # A Listener is a cancellable subscriber to an event stream, they are used
+    # to provide control-flow abstraction throughout em-imap.
     #
-    # There are four types of callback that you can register on a Listener:
+    # They can be thought of as a deferrable with two internal phases:
     #
-    #  .listen(&block)   Each time .receive_event is called, the block will
-    #                    also be called.
+    #   deferrable: create |-------------------------------> [succeed/fail]
+    #   listener:   create |---[listening]----> [stop]-----> [succeed/fail]
     #
-    # *.stopback(&block) When someone calls .stop on the listener, this block
-    #                    will be called.
+    # After stop is called, no further events are listened to.  A stopback may
+    # call succeed or fail immediately, or after performing necessary cleanup.
     #
-    #  .callback(&block) When no more events will be received, and all internal
-    #                    state was successfully cleaned up, this block will be
-    #                    called.
     #
-    #  .errback(&block)  When no more events will be received, because of an
-    #                    error, the block will be called.
+    # There are several hooks to which you can subscribe:
     #
-    # NOTE: Listeners are deferrables enhanced by Deferrable Gratification, so
-    # there's also a .bothback method inherited from there.
+    #  #listen(&block): Each time .receive_event is called, the block will
+    #  be called.
     #
-    # In normal usage, only the library that creates Listeners will need .stopback,
-    # programs using the library should do whatever they will at the same time as
-    # they call stop.
+    #  #stopback(&block): When someone calls .stop on the listener, this block
+    #  will be called.
     #
-    # There are four corresponding ways of firing events at a Listener:
+    #  #callback(&block), #errback(&block), #bothback(&block): Inherited from
+    #  deferrables (and enhanced by deferrable gratification).
     #
-    # *.receive_event(*args) Passed onto blocks registered by listen.
     #
-    #  .stop(*args)          Calls all the stopbacks, and prevents any further
-    #                        .receive_event calls from reaching the .listen
-    #                        blocks.
+    # And the corresponding methods for sending messages to subscribers:
+    #
+    #  #receive_event(*args): Passed onto blocks registered by listen.
+    #
+    #  #stop(*args): Calls all the stopbacks, and prevents any further
+    #  receive_event calls from reaching the listening blocks.
     #  
-    # *.succeed(*args)       Calls all the callbacks, and if .stop was not
-    #                        called previously, calls .stop.
+    #  #succeed(*args), #fail(*args): Inherited from deferrables, calls stop
+    #  if that hasn't yet been called.
     #
-    # *.fail(*args)          Calls all the errbacks, and if .stop was not called
-    #                        previously, calls .stop.
+    # In normal usage the library managing the Listeners will call
+    # receive_event, # succeed and fail; while the program using the library
+    # will call stop.  By the same token, normally the program using the
+    # library will register events on listen, callback and errback, but the
+    # library will use stopback.
     #
-    # In normal usage, the library that creates the Listener is responsible for calling
-    #  .receive_event, .succeed, and .fail, and the program using the library
-    #  is responsible for calling .stop.
+    # NOTE: While succeed and fail will call the stopbacks if necessary, stop
+    # will not succeed or fail the deferrable, that is the job of one of the
+    # stopbacks or external circumstance.
     #
-    class Listener
+    module ListeningDeferrable
       include EM::Deferrable
       DG.enhance!(self)
 
-      def initialize(&block)
-        @stop_deferrable = DefaultDeferrable.new
-        @listeners = []
-        bothback &method(:stop)
-        listen &block if block_given?
-      end
-
+      # Register a block to be called when receive_event is called.
       def listen(&block)
-        tap{ @listeners << block }
+        listeners << block
+        self
       end
 
-      def stopback(*args, &block)
-        tap{ @stop_deferrable.callback *args, &block }
-      end
-
-      def stop(*args, &block)
-        @stopped = true
-        @stop_deferrable.succeed *args, &block
-      end
-
+      # Pass arguments onto any blocks registered with listen.
       def receive_event(*args, &block)
-        @listeners.each{ |l| l.call *args, &block } unless @stopped
+        listeners.each{ |l| l.call *args, &block } unless stopped?
+      end
+
+      # Register a block to be called when the ListeningDeferrable is stopped.
+      def stopback(&block)
+        stop_deferrable.callback &block
+        self
+      end
+
+      # Initiate shutdown.
+      def stop(*args, &block)
+        stopped!
+        stop_deferrable.succeed *args, &block
+      end
+
+      def set_deferred_status(*args, &block)
+        # Ensure that the ListeningDeferrable is stopped first
+        stop
+        super
+      end
+
+      private
+      def listeners; @listeners ||= []; end
+      def stop_deferrable; @stop_deferrable ||= DefaultDeferrable.new; end
+      def stopped!; @stopped = true; end
+      def stopped?; !!@stopped; end
+    end
+
+    class Listener
+      include ListeningDeferrable
+      def initialize(&block)
+        listen &block if block_given?
       end
     end
   end
