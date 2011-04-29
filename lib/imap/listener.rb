@@ -8,9 +8,7 @@ module EventMachine
     #   deferrable: create |-------------------------------> [succeed/fail]
     #   listener:   create |---[listening]----> [stop]-----> [succeed/fail]
     #
-    # After stop is called, no further events are listened to.  A stopback may
-    # call succeed or fail immediately, or after performing necessary cleanup.
-    #
+    # A stopback may call succeed or fail immediately, or after performing necessary cleanup.
     #
     # There are several hooks to which you can subscribe:
     #
@@ -28,8 +26,7 @@ module EventMachine
     #
     #  #receive_event(*args): Passed onto blocks registered by listen.
     #
-    #  #stop(*args): Calls all the stopbacks, and prevents any further
-    #  receive_event calls from reaching the listening blocks.
+    #  #stop(*args): Calls all the stopbacks.
     #  
     #  #succeed(*args), #fail(*args): Inherited from deferrables, calls stop
     #  if that hasn't yet been called.
@@ -56,7 +53,7 @@ module EventMachine
 
       # Pass arguments onto any blocks registered with listen.
       def receive_event(*args, &block)
-        listeners.each{ |l| l.call *args, &block } unless stopped?
+        listeners.each{ |l| l.call *args, &block }
       end
 
       # Register a block to be called when the ListeningDeferrable is stopped.
@@ -67,7 +64,6 @@ module EventMachine
 
       # Initiate shutdown.
       def stop(*args, &block)
-        stopped!
         stop_deferrable.succeed *args, &block
       end
 
@@ -80,8 +76,6 @@ module EventMachine
       private
       def listeners; @listeners ||= []; end
       def stop_deferrable; @stop_deferrable ||= DefaultDeferrable.new; end
-      def stopped!; @stopped = true; end
-      def stopped?; !!@stopped; end
     end
 
     class Listener

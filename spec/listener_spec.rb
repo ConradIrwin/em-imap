@@ -62,15 +62,6 @@ describe EM::Imap::Listener do
     a.should == ["stopped"]
   end
 
-  it "should not receive events after having been stopped" do
-    a = []
-    listener = EM::Imap::Listener.new do |event| a << event end
-    listener.receive_event 55
-    listener.stop
-    listener.receive_event 56
-    a.should == [55]
-  end
-
   it "should not call the callbacks or errbacks after being stopped" do
     a = []
     listener = EM::Imap::Listener.new.callback do a << "callback" end.
