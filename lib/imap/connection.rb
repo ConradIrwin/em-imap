@@ -110,21 +110,13 @@ module EventMachine
       # EM::Imap::ResponseParser. Each response is a Net::IMAP response
       # object. (FIXME)
       def receive_response(response)
-        puts "RECEIVED: #{response}"
-        if response.respond_to?(:tag)
-          puts "WITH TAG: #{response.tag}"
-          pp @listeners.map{|l| l.respond_to?(:tag) ? l.tag : nil }
-        end
         @listeners.each{ |listener| listener.receive_event response }
-      rescue => e
-        puts e.inspect
       end
 
       # Await the response that marks the completion of this command,
       # and succeed or fail the command as appropriate.
       def listen_for_tagged_response(command)
         command.listen do |response|
-          puts "HIIII" if command.tag == "RUBY0004"
           if response.is_a?(Net::IMAP::TaggedResponse) && response.tag == command.tag
             case response.name
             when "NO"

@@ -182,8 +182,6 @@ module EventMachine
       #
       def idle(&block)
         send_command("IDLE").listen(&block).tap do |command|
-          command.callback{ |*a| puts "CALLBACK" }
-          command.errback{ |*a| puts "CALLBACK" }
           @connection.prepare_idle_continuation(command)
         end
       end
