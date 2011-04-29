@@ -235,19 +235,19 @@ module EventMachine
       def fetch_internal(cmd, set, attr)
         case attr
         when String then
-          attr = RawData.new(attr)
+          attr = Net::IMAP::RawData.new(attr)
         when Array then
           attr = attr.map { |arg|
-            arg.is_a?(String) ? RawData.new(arg) : arg
+            arg.is_a?(String) ? Net::IMAP::RawData.new(arg) : arg
           }
         end
 
-        multi_data_response(cmd)
+        multi_data_response(cmd, set, attr)
       end
 
       def store_internal(cmd, set, attr, flags)
         if attr.instance_of?(String)
-          attr = RawData.new(attr)
+          attr = Net::IMAP::RawData.new(attr)
         end
         collect_untagged_responses('FETCH', cmd, *args)
       end
