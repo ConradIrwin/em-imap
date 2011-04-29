@@ -2,49 +2,129 @@ module EventMachine
   module Imap
     CRLF = "\r\n"
     module Connection
-      include ListeningDeferrable
+      include EM::Deferrable
+      DG.enhance!(self)
+
       include Imap::CommandSender
       include Imap::ResponseParser
 
+      # Create a new connection to an IMAP server.
+      #
+      # @param host, The host name (warning DNS lookups are synchronous)
+      # @param port, The port to connect to.
+      # @param ssl=false, Whether or not to use TLS.
+      #
+      # @return Connection, a deferrable that will succeed when the server
+      #                     has replied with OK or PREAUTH, or fail if the
+      #                     connection could not be established, or the
+      #                     first response was BYE.
+      #
       def self.connect(host, port, ssl=false)
-        EventMachine.connect(host, port, self).tap do |conn|
+        conn = EventMachine.connect(host, port, self).tap do |conn|
           conn.start_tls if ssl
         end
       end
 
-      def post_init
-        @untagged_responses = {}
-        @tagged_listeners = {}
-        @listeners = []
-        super
-        errback do |e|
-          @listeners.each{ |listener| listener.fail e }
-        end
-        listen_for_bye
-      end
-
-      def untagged_responses
-        @untagged_responses
-      end
-
-      def send_command(cmd, *args, &block)
-        Command.new(next_tag!, cmd, args, &block).tap do |command|
+      # Send the command, with the given arguments, to the IMAP server.
+      #
+      # @param cmd, the name of the command to send (a string)
+      # @param *args, the arguments for the command, serialized
+      #               by Net::IMAP. (FIXME)
+      #
+      # @return Command, a listener and deferrable that will receive_event
+      #                  with the responses from the IMAP server, and which
+      #                  will succeed with a tagged response from the
+      #                  server, or fail with a tagged error response, or
+      #                  an exception.
+      #
+      #                  NOTE: The responses it overhears may be intended
+      #                  for other commands that are running in parallel.
+      #
+      # Exceptions thrown during serialization will be thrown to the user,
+      # exceptions thrown while communicating to the socket will cause the
+      # returned command to fail.
+      #
+      def send_command(cmd, *args)
+        Command.new(next_tag!, cmd, args).tap do |command|
           add_to_listener_pool(command)
           listen_for_tagged_response(command)
+          listen_for_bye_response(command)
           send_command_object(command)
         end
+      end
+
+      # Create a new listener for responses from the IMAP server.
+      #
+      # @param  &block, a block to which all responses will be passed.
+      # @return Listener, an object with a .stop method that you can
+      #         use to unregister this block.
+      #
+      #         You may also want to listen on the Listener's errback
+      #         for when problems arise. The Listener's callbacks will
+      #         be called after you call its stop method.
+      #
+      def add_response_handler(&block)
+        Listener.new(&block).tap do |listener|
+          listener.stopback{ listener.succeed }
+          add_to_listener_pool(listener)
+          listen_for_bye_response(listener)
+        end
+      end
+
+      def post_init
+        @listeners = Set.new
+        super
+        listen_for_greeting
+      end
+
+      # Listen for the first response from the server and succeed or fail
+      # the connection deferrable.
+      def listen_for_greeting
+        hello_listener = add_response_handler do |response|
+          hello_listener.stop
+          if response.is_a?(Net::IMAP::UntaggedResponse)
+            if response.name == "BYE"
+              fail Net::IMAP::ByeResponseError.new(response.raw_data)
+            else
+              succeed response
+            end
+          else
+            fail Net::IMAP::ResponseParseError.new(response.raw_data)
+          end
+        end
+      end
+
+      # Called when the connection is closed.
+      # If there are any listeners left, we fail them.
+      # (TODO: Should we actually succeed them if the connection was
+      # explicitly closed by us?)
+      def unbind
+        @listeners.each{ |listener| listener.fail EOFError.new("Connection to IMAP server was unbound") }
       end
 
       def add_to_listener_pool(listener)
         @listeners << listener.bothback{ @listeners.delete listener }
       end
 
+      # receive_response is a higher-level receive_data provided by
+      # EM::Imap::ResponseParser. Each response is a Net::IMAP response
+      # object. (FIXME)
       def receive_response(response)
+        puts "RECEIVED: #{response}"
+        if response.respond_to?(:tag)
+          puts "WITH TAG: #{response.tag}"
+          pp @listeners.map{|l| l.respond_to?(:tag) ? l.tag : nil }
+        end
         @listeners.each{ |listener| listener.receive_event response }
+      rescue => e
+        puts e.inspect
       end
 
+      # Await the response that marks the completion of this command,
+      # and succeed or fail the command as appropriate.
       def listen_for_tagged_response(command)
         command.listen do |response|
+          puts "HIIII" if command.tag == "RUBY0004"
           if response.is_a?(Net::IMAP::TaggedResponse) && response.tag == command.tag
             case response.name
             when "NO"
@@ -58,30 +138,13 @@ module EventMachine
         end
       end
 
-      def listen_for_bye
-        add_response_handler do |response|
+      # If we receive a BYE response from the server, then we're not going
+      # to hear any more, so we fail all our listeners.
+      def listen_for_bye_response(listener)
+        listener.listen do |response|
           if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == "BYE"
-            if stopped?
-              succeed
-            else
-              fail Net::IMAP::ByeResponseError.new(response.raw_data)
-            end
+            listener.fail Net::IMAP::ByeResponseError.new(response.raw_data)
           end
-        end
-      end
-
-      def add_response_handler(&block)
-        Listener.new(&block).tap do |listener|
-          listener.stopback{ listener.succeed }
-          add_to_listener_pool(listener)
-        end
-      end
-
-      def unbind
-        if stopped?
-          succeed
-        else
-          fail EOFError.new("end of file reached")
         end
       end
 

@@ -1,4 +1,5 @@
 require 'net/imap'
+require 'set'
 
 require 'rubygems'
 require 'eventmachine'

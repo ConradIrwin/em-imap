@@ -181,7 +181,9 @@ module EventMachine
       # EM.timeout(60) { idler.stop }
       #
       def idle(&block)
-        @connection.send_command("IDLE", &block).tap do |command|
+        send_command("IDLE").listen(&block).tap do |command|
+          command.callback{ |*a| puts "CALLBACK" }
+          command.errback{ |*a| puts "CALLBACK" }
           @connection.prepare_idle_continuation(command)
         end
       end
@@ -212,7 +214,7 @@ module EventMachine
       def collect_untagged_responses(name, *command)
         untagged_responses = []
 
-        send_command(*command) do |response|
+        send_command(*command).listen do |response|
           if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == name
             untagged_responses << response
 
