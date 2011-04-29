@@ -24,7 +24,6 @@ module EventMachine
     # to block the outbound link while waiting for the continuation
     # responses that it is expecting.
     #
-    # TODO: This synchronisation mehcanism ought to be available standalone...
     module ContinuationSynchronisation
 
       def post_init
@@ -37,10 +36,14 @@ module EventMachine
         !!@awaiting_continuation
       end
 
-      # Pass all continuation responses to the block.
+      # Await further continuation responses from the server, and
+      # pass them to the given block.
       #
-      # Returns a deferrable which you should succeed when you have
-      # received all the necessary continuations.
+      # As a side-effect causes when_not_awaiting_continuations to
+      # queue further blocks instead of executing them immediately.
+      #
+      # NOTE: If there's currently a different block awaiting continuation
+      # responses, this block will be added to its queue.
       def await_continuations(&block)
         Listener.new(&block).tap do |waiter|
           when_not_awaiting_continuation do
@@ -52,27 +55,23 @@ module EventMachine
         end
       end
 
-      # Pass any continuation response to the block that is expecting it.
+      # Add a single, permanent listener to the connection that forwards
+      # continuation responses onto the currently awaiting block.
       def listen_for_continuation
         add_response_handler do |response|
-          if response.is_a?(Net::IMAP::ContinuationRequest)
-            if awaiting_continuation?
-              @awaiting_continuation.receive_event response
-            else
-              fail Net::IMAP::ResponseParseError.new(response.raw_data)
-            end
+          if awaiting_continuation? && response.is_a?(Net::IMAP::ContinuationRequest)
+            @awaiting_continuation.receive_event response
           end
         end
       end
 
-      # Wait until the connection is not waiting for a continuation before
-      # performing this block.
+      # If nothing is listening for continuations from the server,
+      # execute the block immediately.
+      # 
+      # Otherwise add the block to the queue.
       #
-      # If possible, the block will be executed immediately; if not it will
-      # be added to a queue and executed whenever the queue has been emptied.
-      #
-      # Note that if a queued callback retakes the synchronisation lock then
-      # all the later callbacks will be tranferred to the new queue.
+      # When we have replied to the server's continuation response,
+      # the queue will be emptied in-order.
       #
       def when_not_awaiting_continuation(&block)
         if awaiting_continuation?
