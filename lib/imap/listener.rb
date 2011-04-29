@@ -28,18 +28,12 @@ module EventMachine
     #
     #  #stop(*args): Calls all the stopbacks.
     #  
-    #  #succeed(*args), #fail(*args): Inherited from deferrables, calls stop
-    #  if that hasn't yet been called.
+    #  #succeed(*args), #fail(*args): Inherited from deferrables.
     #
-    # In normal usage the library managing the Listeners will call
-    # receive_event, # succeed and fail; while the program using the library
-    # will call stop.  By the same token, normally the program using the
-    # library will register events on listen, callback and errback, but the
-    # library will use stopback.
     #
-    # NOTE: While succeed and fail will call the stopbacks if necessary, stop
-    # will not succeed or fail the deferrable, that is the job of one of the
-    # stopbacks or external circumstance.
+    # NOTE: It is normally the case that the code "listening" to the listener
+    # will call stop, and that the code sending events to the listener will
+    # call succeed or fail.
     #
     module ListeningDeferrable
       include EM::Deferrable
@@ -65,12 +59,6 @@ module EventMachine
       # Initiate shutdown.
       def stop(*args, &block)
         stop_deferrable.succeed *args, &block
-      end
-
-      def set_deferred_status(*args, &block)
-        # Ensure that the ListeningDeferrable is stopped first
-        stop
-        super
       end
 
       private
