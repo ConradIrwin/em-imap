@@ -91,6 +91,8 @@ module EventMachine
           else
             fail Net::IMAP::ResponseParseError.new(response.raw_data)
           end
+        end.errback do |e|
+          fail e
         end
       end
 
@@ -98,6 +100,7 @@ module EventMachine
       # If there are any listeners left, we fail them.
       # (TODO: Should we actually succeed them if the connection was
       # explicitly closed by us?)
+      # TODO: Figure out how to send a useful error...
       def unbind
         @listeners.each{ |listener| listener.fail EOFError.new("Connection to IMAP server was unbound") }
       end
