@@ -2,49 +2,68 @@ module EventMachine
   module Imap
     # TODO: Anything that accepts or returns a mailbox name should have UTF7 support.
     class Client
+      include EM::Deferrable
+      DG.enhance!(self)
+
       include Imap::Authenticators
 
       def initialize(connection)
-        @connection = connection
+        @connection = connection.errback{ |e| fail e }.callback{ |response| succeed response }
       end
 
       def disconnect
         @connection.close_connection
       end
 
-      def untagged_responses
-        @connection.untagged_responses
-      end
-      alias :responses :untagged_responses
-
       ## 6.1 Client Commands - Any State.
 
+      # Ask the server which capabilities it supports.
+      #
+      # Succeeds with an array of capabilities.
+      #
       def capability
-        one_data_response("CAPABILITY")
+        one_data_response("CAPABILITY").transform{ |response| response.data }
       end
 
+      # Actively do nothing.
+      #
+      # This is useful as a keep-alive, or to persuade the server to send
+      # any untagged responses your listeners would like.
+      #
+      # Succeeds with nil.
+      #
       def noop
-        tagged_response("NOOP")
+        no_response("NOOP")
       end
 
       # Logout and close the connection.
+      #
+      # This will cause any other listeners or commands that are still active
+      # to fail, and render this client unusable.
+      #
       def logout
-        command = tagged_response("LOGOUT").errback do |e|
+        command = no_response("LOGOUT").errback do |e|
           if e.is_a? Net::IMAP::ByeResponseError
             # RFC 3501 says the server MUST send a BYE response and then close the connection.
             disconnect
-            command.succeed e
+            command.succeed
           end
         end
       end
 
       ## 6.2 Client Commands - Not Authenticated State
 
+      # This would start tls negotiations.
+      #
+      # Instead please pass true during initialize.
+      #
       def starttls
         raise NotImplementedError
       end
 
       def authenticate(auth_type, *args)
+        # Extract these first so that any exceptions can be raised
+        # before the command is created.
         auth_type = auth_type.upcase
         auth_handler = authenticator(auth_type, *args)
 
@@ -192,27 +211,48 @@ module EventMachine
 
       private
       
-      # The callback of a Command returns both a tagged response,
-      # and optionally a list of untagged responses that were
-      # generated at the same time.
+      # Send a command that should return a deferrable that succeeds with
+      # a tagged_response.
+      #
       def tagged_response(cmd, *args)
-        send_command(cmd, *args)
+        # We put in an otherwise unnecessary transform to hide the listen
+        # method from callers for consistency with other types of responses.
+        send_command(cmd, *args).transform do |tagged_response|
+          tagged_response
+        end
       end
 
+      # Send a command that should return a deferrable that succeeds with
+      # no response.
+      #
+      def no_response(cmd, *args)
+        send_command(cmd, *args).transform do |tagged_response|; end
+      end
+
+      # Send a command that should return a deferrable that succeeds with
+      # a single untagged response with the same name as the command.
+      #
       def one_data_response(cmd, *args)
         multi_data_response(cmd, *args).transform do |untagged_responses|
           untagged_responses.last
         end
       end
 
+      # Send a command that should return a deferrable that succeeds with
+      # multiple untagged responses with the same name as the command.
+      #
       def multi_data_response(cmd, *args)
         collect_untagged_responses(cmd, cmd, *args)
       end
 
+      # Send a command that should return a deferrable that succeeds with
+      # multiple untagged responses with the given name.
+      #
       def collect_untagged_responses(name, *command)
         untagged_responses = []
 
         send_command(*command).listen do |response|
+          puts "FOO: #{response.name} ?? #{name}"
           if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == name
             untagged_responses << response
 

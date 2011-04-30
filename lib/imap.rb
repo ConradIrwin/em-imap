@@ -18,10 +18,13 @@ $:.shift
 
 module EventMachine
   module Imap
+    # Connect to the specified IMAP server, using ssl if applicable.
+    #
+    # Returns a deferrable that will succeed or fail based on the
+    # success of the connection setup phase.
+    #
     def self.connect(host, port, ssl=false)
-      conn = EventMachine.connect(host, port, EventMachine::Imap::Connection)
-      conn.start_tls if ssl
-      Client.new(conn)
+      Client.new(EventMachine::Imap::Connection.connect(host, port, ssl))
     end
 
     class Command < Listener
