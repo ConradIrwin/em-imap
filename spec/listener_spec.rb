@@ -40,4 +40,67 @@ describe EM::Imap::Listener do
     listener.stop
     a.should == ["callback"]
   end
+
+  describe "transform" do
+    before :each do
+      @bottom = EM::Imap::Listener.new
+      @top = @bottom.transform{ |result| :transformed }
+    end
+
+    it "should propagate .receive_event upwards" do
+      a = []
+      @top.listen{ |event| a << event }
+      @bottom.receive_event :event
+      a.should == [:event]
+    end
+
+    it "should not propagate .receive_event downwards" do
+      a = []
+      @bottom.listen{ |event| a << event }
+      @top.receive_event :event
+      a.should == []
+    end
+
+    it "should propagate .fail upwards" do
+      a = []
+      @top.errback{ |error| a << error }
+      @bottom.fail :fail
+      a.should == [:fail]
+    end
+
+    it "should not propagate .fail downwards" do
+      a = []
+      @bottom.errback{ |error| a << error }
+      @top.fail :fail
+      a.should == []
+    end
+
+    it "should propagate .stop downwards" do
+      a = []
+      @bottom.stopback{ a << :stop }
+      @top.stop
+      a.should == [:stop]
+    end
+
+    it "should not propagate .stop upwards" do
+      a = []
+      @top.stopback{ a << :stop }
+      @bottom.stop
+      a.should == []
+    end
+
+    it "should propagate .succeed upwards through .transform" do
+      a = []
+      @top.callback{ |value| a << value }
+      @bottom.succeed :succeeded
+      a.should == [:transformed]
+    end
+
+    it "should not propagate .succeed downwards" do
+      a = []
+      @bottom.callback{ |value| a << value }
+      @top.succeed :succeeded
+      a.should == []
+    end
+  end
 end
