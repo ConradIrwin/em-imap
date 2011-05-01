@@ -202,57 +202,131 @@ module EventMachine
 
       # 6.4 Client Commands - Selected State
       
+      # Checkpoint the current mailbox.
+      #
+      # This is an implementation-defined operation, when in doubt, NOOP
+      # should be used instead.
+      #
       def check
         tagged_response("CHECK")
       end
 
+      # Unselect the current mailbox.
+      #
+      # As a side-effect, permanently removes any messages that have the
+      # \Deleted flag. (Unless the mailbox was selected using the EXAMINE,
+      # in which case no side effects occur).
+      #
       def close
         tagged_response("CLOSE")
       end
       
+      # Permanently remove any messages with the \Deleted flag from the current
+      # mailbox.
+      #
+      # Succeeds with a list of message sequence numbers that were deleted.
+      #
+      # NOTE: If you're planning to EXPUNGE and then SELECT a new mailbox,
+      # and you don't care which messages are removed, consider using
+      # CLOSE instead.
+      #
       def expunge
-        tagged_response("EXPUNGE")
+        multi_data_response("EXPUNGE").transform do |untagged_responses|
+          untagged_responses.map(&:data)
+        end
       end
 
-      def search(keys, charset=nil)
-        search_internal(["SEARCH"], keys, charset)
+      # Search for messages in the current mailbox.
+      #
+      # @param *args The arguments to search, these can be strings, arrays or ranges
+      #              specifying sub-groups of search arguments or sets of messages.
+      #
+      #              If you want to use non-ASCII characters, then the first two
+      #              arguments should be 'CHARSET', 'UTF-8', though not all servers
+      #              support this.
+      #
+      # @succeed A list of message sequence numbers.
+      #
+      def search(*args)
+        search_internal(["SEARCH"], *args)
       end
 
-      def uid_search(keys, charset=nil)
-        search_internal(["UID SEARCH"], keys, charset)
+      # The same as search, but succeeding with a list of UIDs not sequence numbers.
+      #
+      def uid_search(*args)
+        search_internal(["UID", "SEARCH"], *args)
       end
 
       # SORT and THREAD (like SEARCH) from http://tools.ietf.org/search/rfc5256
-      def sort(sort_keys, search_keys, charset=nil)
-        search_internal(["SORT", sort_keys], search_keys, charset)
+      #
+      def sort(sort_keys, *args)
+        raise NotImplementedError
       end
 
-      def uid_sort
-        search_internal(["UID SORT", sort_keys], search_keys, charset)
+      def uid_sort(sort_keys, *args)
+        raise NotImplementedError
       end
 
-      def thread(algorithm, search_keys, charset=nil)
-        search_internal(["THREAD", algorithm], search_keys, charset)
+      def thread(algorithm, *args)
+        raise NotImplementedError
       end
 
-      def uid_thread
-        search_internal(["UID THREAD", algorithm], search_keys, charset)
+      def uid_thread(algorithm, *args)
+        raise NotImplementedError
       end
 
-      def fetch(seq, attr)
+      # Get the contents of, or information about, a message.
+      # 
+      # @param seq, a message or sequence of messages (a number, a range or an array of numbers)
+      # @param attr, the name of the attribute to fetch, or a list of attributes.
+      #
+      # Possible attribute names (see RFC 3501 for a full list):
+      #
+      #  ALL: Gets all header information,
+      #  FULL: Same as ALL with the addition of the BODY,
+      #  FAST: Same as ALL without the message envelope.
+      #
+      #  BODY: The body
+      #  BODY[<section>] A particular section of the body
+      #  BODY[<section>]<<start>,<length>> A substring of a section of the body.
+      #  BODY.PEEK: The body (but doesn't change the \Recent flag)
+      #  FLAGS: The flags
+      #  INTERNALDATE: The internal date
+      #  UID: The unique identifier
+      #
+      def fetch(seq, attr="FULL")
         fetch_internal("FETCH", seq, attr)
       end
 
-      def uid_fetch(seq, attr)
-        fetch_internal("UID FETCH", seq, attr)
+      # The same as fetch, but keyed of UIDs instead of sequence numbers.
+      #
+      def uid_fetch(seq, attr="FULL")
+        fetch_internal("UID", "FETCH", seq, attr)
       end
 
+      # Update the flags on a message.
+      #
+      # @param seq, a message or sequence of messages (a number, a range, or an array of numbers)
+      # @param name, any of FLAGS FLAGS.SILENT, replace the flags
+      #                     +FLAGS, +FLAGS.SILENT, add the following flags
+      #                     -FLAGS, -FLAGS.SILENT, remove the following flags
+      #             The .SILENT versions suppress the server's responses.
+      # @param value, a list of flags (symbols)
+      #
       def store(seq, name, value)
         store_internal("STORE", seq, name, value)
       end
 
+      # The sames as store, but keyed of UIDs instead of sequence numbers.
+      #
       def uid_store(seq, name, value)
-        store_internal("UID STORE", seq, name, value)
+        store_internal("UID", "STORE", seq, name, value)
+      end
+
+      # Copy the specified messages to another mailbox.
+      #
+      def copy(seq, mailbox)
+        tagged_response("COPY", Net::IMAP::MessageSet.new(seq), to_utf7(mailbox))
       end
 
       # The IDLE command allows you to wait for any untagged responses
@@ -367,38 +441,42 @@ module EventMachine
           }
         end
 
-        multi_data_response(cmd, set, attr)
+        set = Net::IMAP::MessageSet.new(set)
+
+        multi_data_response(cmd, set, attr).transform do |untagged_responses|
+          untagged_responses.map(&:data)
+        end
       end
 
+      # Ensure that the flags are symbols, and that the message set is a message set.
       def store_internal(cmd, set, attr, flags)
-        if attr.instance_of?(String)
-          attr = Net::IMAP::RawData.new(attr)
-        end
-        collect_untagged_responses('FETCH', cmd, *args)
-      end
-
-      # From Net::IMAP
-      def search_internal(command, keys, charset)
-        if keys.instance_of?(String)
-          keys = [Net::IMAP::RawData.new(keys)]
-        else
-          normalize_searching_criteria(keys)
-        end
-        if charset
-          one_data_response *(command + ["CHARSET", charset] + keys)
-        else
-          one_data_response *(command + keys)
+        flags = flags.map(&:to_sym)
+        set = Net::IMAP::MessageSet.new(set)
+        collect_untagged_responses('FETCH', cmd, set, attr, flags).transform do |untagged_responses|
+          untagged_responses.map(&:data)
         end
       end
 
-      # From Net::IMAP
-      def normalize_searching_criteria(keys)
-        keys.collect! do |i|
-          case i
-          when -1, Range, Array
-            Net::IMAP::MessageSet.new(i)
+      def search_internal(command, *args)
+        command += normalize_search_criteria(args)
+        one_data_response(*command).transform{ |untagged_response| untagged_response.data }
+      end
+
+      # Recursively find all the message sets in the arguments and convert them so that
+      # Net::IMAP can serialize them.
+      def normalize_search_criteria(args)
+        args.map do |arg|
+          case arg
+          when "*", -1, Range
+            Net::IMAP::MessageSet.new(arg)
+          when Array
+            if Array.all?{ |item| item.is_a?(Number) || item.is_a?(Range) }
+              Net::IMAP::MessageSet.new(arg)
+            else
+              normalize_search_criteria(arg)
+            end
           else
-            i
+            arg
           end
         end
       end
