@@ -69,16 +69,48 @@ describe EM::Imap::Client do
       a.should == true
     end
 
+    it "should publish the untagged responses during a select" do
+      a = []
+      b = nil
+      @connection.should_receive(:send_data).with("RUBY0001 SELECT \"[Google Mail]/All Mail\"\r\n")
+      @client.select("[Google Mail]/All Mail").listen{ |response| a << response }.callback{ b = true }.errback{ b = false }
+      @connection.receive_data "* FLAGS (\\Answered \\Flagged \\Draft \\Deleted \\Seen)\r\n" +
+                               "* OK [PERMANENTFLAGS (\\Answered \\Flagged \\Draft \\Deleted \\Seen \\*)]\r\n" +
+                               "* OK [UIDVALIDITY 1]\r\n" +
+                               "* 38871 EXISTS\r\n" + 
+                               "* 0 RECENT\r\n" + 
+                               "* OK [UIDNEXT 95025]\r\n" +
+                               "RUBY0001 OK [READ-WRITE] [Google Mail]/All Mail selected. (Success)\r\n"
+
+      a.map(&:name).should == ["FLAGS", "OK", "OK", "EXISTS", "RECENT", "OK", "OK"]
+      a[0].data.should == [:Answered, :Flagged, :Draft, :Deleted, :Seen]
+      a[1].data.code.name.should == "PERMANENTFLAGS"
+      a[3].data.should == 38871
+      a[4].data.should == 0
+      b.should == true
+    end
+
+    it "should use utf7 for mailbox names" do
+      @connection.should_receive(:send_data).with("RUBY0001 CREATE Encyclop&AOY-dia\r\n")
+      @client.create("Encyclop\xc3\xa6dia")
+      @connection.receive_data "* RUBY0001 OK Success\r\n"
+    end
+
     describe "login" do
       it "should callback on a successful login" do
         a = nil
         @connection.should_receive(:send_data).with("RUBY0001 LOGIN conrad password\r\n")
-        @client.login('conrad', 'password')
+        @client.login('conrad', 'password').callback{ a = true }
         @connection.receive_data "RUBY0001 OK conrad authenticated\r\n"
+        a.should be_true
       end
 
       it "should errback on a failed login" do
-
+        a = nil
+        @connection.should_receive(:send_data).with("RUBY0001 LOGIN conrad \"pass(word)\"\r\n")
+        @client.login('conrad', 'pass(word)').errback{ |response| a = response.class }
+        @connection.receive_data "RUBY0001 NO [AUTHENTICATIONFAILED] Invalid credentials\r\n"
+        a.should == Net::IMAP::NoResponseError
       end
     end
 

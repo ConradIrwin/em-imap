@@ -33,7 +33,7 @@ module EventMachine
       # Succeeds with nil.
       #
       def noop
-        no_response("NOOP")
+        tagged_response("NOOP")
       end
 
       # Logout and close the connection.
@@ -42,7 +42,7 @@ module EventMachine
       # to fail, and render this client unusable.
       #
       def logout
-        command = no_response("LOGOUT").errback do |e|
+        command = tagged_response("LOGOUT").errback do |e|
           if e.is_a? Net::IMAP::ByeResponseError
             # RFC 3501 says the server MUST send a BYE response and then close the connection.
             disconnect
@@ -53,14 +53,23 @@ module EventMachine
 
       ## 6.2 Client Commands - Not Authenticated State
 
-      # This would start tls negotiations.
-      #
-      # Instead please pass true during initialize.
+      # This would start tls negotiations, until this is implemented,
+      # simply pass true as the first parameter to EM::Imap.connect.
       #
       def starttls
         raise NotImplementedError
       end
 
+      # Authenticate using a custom authenticator.
+      #
+      # By default there are two custom authenticators available:
+      #
+      #  'LOGIN', username, password
+      #  'CRAM-MD5', username, password (see RFC 2195)
+      #
+      # Though you can add new mechanisms using EM::Imap.add_authenticator,
+      # see for example the gmail_xoauth gem.
+      #  
       def authenticate(auth_type, *args)
         # Extract these first so that any exceptions can be raised
         # before the command is created.
@@ -72,62 +81,123 @@ module EventMachine
         end
       end
 
+      # Authenticate with a username and password.
+      #
+      # NOTE: this SHOULD only work over a tls connection.
+      #
+      # If the password is wrong, the command will fail with a
+      # Net::IMAP::NoResponseError.
+      #
       def login(username, password)
         tagged_response("LOGIN", username, password)
       end
 
       ## 6.3 Client Commands - Authenticated State
 
-      # TODO: Figure out API for EXISTS, RECENT, etc.
+      # Select a mailbox for performing commands against. 
+      #
+      # This will generate untagged responses that you can subscribe to
+      # by adding a block to the listener with .listen, for more detail,
+      # see RFC 3501, section 6.3.1.
+      #
       def select(mailbox)
-        tagged_response("SELECT", mailbox)
+        tagged_response("SELECT", to_utf7(mailbox))
       end
 
+      # Select a mailbox for performing read-only commands.
+      #
+      # This is exactly the same as select, except that no operation may
+      # cause a change to the state of the mailbox or its messages.
+      #
       def examine(mailbox)
-        tagged_response("EXAMINE", mailbox)
+        tagged_response("EXAMINE", to_utf7(mailbox))
       end
 
+      # Create a new mailbox with the given name.
+      #
       def create(mailbox)
-        tagged_response("CREATE", mailbox)
+        tagged_response("CREATE", to_utf7(mailbox))
       end
 
+      # Delete the mailbox with this name.
+      #
       def delete(mailbox)
-        tagged_response("DELETE", mailbox)
+        tagged_response("DELETE", to_utf7(mailbox))
       end
 
-      def rename(mailbox, newname)
-        tagged_response("RENAME", mailbox, newname)
+      # Rename the mailbox with this name.
+      #
+      def rename(oldname, newname)
+        tagged_response("RENAME", to_utf7(oldname), to_utf7(newname))
       end
 
+      # Add this mailbox to the list of subscribed mailboxes.
+      #
       def subscribe(mailbox)
-        tagged_response("SUBSCRIBE", mailbox)
+        tagged_response("SUBSCRIBE", to_utf7(mailbox))
       end
 
+      # Remove this mailbox from the list of subscribed mailboxes.
+      #
       def unsubscribe(mailbox)
-        tagged_response("UNSUBSCRIBE", mailbox)
+        tagged_response("UNSUBSCRIBE", to_utf7(mailbox))
       end
 
-      def list(refname="", mailbox="*")
-        multi_data_response("LIST", refname, mailbox)
+      # List all available mailboxes.
+      #
+      # @param: refname, an optional context in which to list.
+      # @param: mailbox, a  which mailboxes to return.
+      #
+      # Succeeds with a list of Net::IMAP::MailboxList structs, each of which has:
+      #   .name, the name of the mailbox (in UTF8)
+      #   .delim, the delimeter (normally "/")
+      #   .attr, A list of attributes, e.g. :Noselect, :Haschildren, :Hasnochildren.
+      #
+      def list(refname="", pattern="*")
+        list_internal("LIST", refname, pattern)
       end
 
-      def lsub(refname, mailbox)
-        multi_data_response("LSUB", rename, mailbox)
+      # List all subscribed mailboxes.
+      #
+      # This is the same as list, but restricted to mailboxes that have been subscribed to.
+      #
+      def lsub(refname, pattern)
+        list_internal("LSUB", refname, pattern)
       end
 
-      def status(mailbox, attr)
-        # FIXME: Why is this transform needed?
-        one_data_response("STATUS", mailbox, attr).transform do |response|
-          response.attr
+      # Get the status of a mailbox.
+      #
+      # This provides similar information to the untagged responses you would
+      # get by running SELECT or EXAMINE without doing so.
+      #
+      # @param mailbox, a mailbox to query
+      # @param attrs, a list of attributes to query for (valid values include
+      #        MESSAGES, RECENT, UIDNEXT, UIDVALIDITY and UNSEEN — RFC3501#6.3.8)
+      #
+      # Succeeds with a hash of attribute name to value returned by the server.
+      #
+      def status(mailbox, attrs)
+        one_data_response("STATUS", to_utf7(mailbox), attrs).transform do |response|
+          response.data.attr
         end
       end
 
+      # Add a message to the mailbox.
+      #
+      # @param mailbox, the mailbox to add to,
+      # @param message, the full text (including headers) of the email to add.
+      # @param flags, A list of flags to set on the email.
+      # @param date_time, The time to be used as the internal date of the email.
+      #
+      # The tagged response with which this command succeeds contains the UID
+      # of the email that was appended.
+      #
       def append(mailbox, message, flags=nil, date_time=nil)
-        args = [mailbox]
+        args = [to_utf7(mailbox)]
         args << flags if flags
         args << date_time if date_time
         args << Net::IMAP::Literal.new(message)
-        tagged_response("APPEND" *args)
+        tagged_response("APPEND", *args)
       end
 
       # 6.4 Client Commands - Selected State
@@ -210,6 +280,20 @@ module EventMachine
       end
 
       private
+
+      # Convert a string to the modified UTF-7 required by IMAP for mailbox naming.
+      # See RFC 3501 Section 5.1.3 for more information.
+      #
+      def to_utf7(text)
+        Net::IMAP.encode_utf7(text)
+      end
+
+      # Convert a string from the modified UTF-7 required by IMAP for mailbox naming.
+      # See RFC 3501 Section 5.1.3 for more information.
+      #
+      def to_utf8(text)
+        Net::IMAP.decode_utf7(text)
+      end
       
       # Send a command that should return a deferrable that succeeds with
       # a tagged_response.
@@ -217,16 +301,7 @@ module EventMachine
       def tagged_response(cmd, *args)
         # We put in an otherwise unnecessary transform to hide the listen
         # method from callers for consistency with other types of responses.
-        send_command(cmd, *args).transform do |tagged_response|
-          tagged_response
-        end
-      end
-
-      # Send a command that should return a deferrable that succeeds with
-      # no response.
-      #
-      def no_response(cmd, *args)
-        send_command(cmd, *args).transform do |tagged_response|; end
+        send_command(cmd, *args)
       end
 
       # Send a command that should return a deferrable that succeeds with
@@ -252,7 +327,6 @@ module EventMachine
         untagged_responses = []
 
         send_command(*command).listen do |response|
-          puts "FOO: #{response.name} ?? #{name}"
           if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == name
             untagged_responses << response
 
@@ -269,6 +343,17 @@ module EventMachine
 
       def send_command(cmd, *args)
         @connection.send_command(cmd, *args)
+      end
+
+      # Extract more useful data from the LIST and LSUB commands, see #list for details. 
+      def list_internal(cmd, refname, pattern)
+        multi_data_response(cmd, to_utf7(refname), to_utf7(pattern)).transform do |untagged_responses|
+          untagged_responses.map(&:data).map do |data|
+            data.dup.tap do |new_data|
+              new_data.name = to_utf8(data.name)
+            end
+          end
+        end
       end
 
       # From Net::IMAP
