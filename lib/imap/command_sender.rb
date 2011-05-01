@@ -1,11 +1,11 @@
 module EventMachine
-  module Imap
+  module IMAP
     # Provides a send_command_object method that serializes command objects
     # and uses send_data on them. This is the ugly sister to ResponseParser.
     module CommandSender
       # Ugly hack to get at the Net::IMAP string formatting routines.
       # (FIXME: Extract into its own module and rewrite)
-      class FakeNetImap < Net::IMAP
+      class FakeNetIMAP < Net::IMAP
         def initialize(command, imap_connection)
           @command = command
           @connection = imap_connection
@@ -28,7 +28,7 @@ module EventMachine
       # If you pass something that cannot be serialized, an exception will be raised.
       # If however, something fails at the socket level, the command will be failed.
       def send_command_object(command)
-        sender = FakeNetImap.new(command, self)
+        sender = FakeNetIMAP.new(command, self)
 
         sender.put_string "#{command.tag} #{command.cmd}"
         command.args.each do |arg|
@@ -111,8 +111,8 @@ module EventMachine
           end
         end
       end
-      include Imap::CommandSender::LineBuffer
-      include Imap::ContinuationSynchronisation
+      include IMAP::CommandSender::LineBuffer
+      include IMAP::ContinuationSynchronisation
     end
   end
 end

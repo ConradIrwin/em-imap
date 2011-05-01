@@ -1,5 +1,5 @@
 module EventMachine
-  module Imap
+  module IMAP
     # A Listener is a cancellable subscriber to an event stream, they are used
     # to provide control-flow abstraction throughout em-imap.
     #

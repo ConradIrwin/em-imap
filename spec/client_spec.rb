@@ -1,17 +1,17 @@
 require 'spec_helper'
 
-describe EM::Imap::Client do
+describe EM::IMAP::Client do
 
   before :each do
     @connection = Class.new(EMStub) do
-      include EM::Imap::Connection
+      include EM::IMAP::Connection
     end.new
   end
 
   describe "connection" do
     it "should succeed if the connection receives a successful greeting" do
       a = false
-      EM::Imap::Client.new(@connection).callback do |response|
+      EM::IMAP::Client.new(@connection).callback do |response|
         a = true
       end
       @connection.receive_data "* OK Welcome, test IMAP!\r\n"
@@ -20,16 +20,16 @@ describe EM::Imap::Client do
 
     it "should fail if the connection receives a BYE" do
       a = false
-      EM::Imap::Client.new(@connection).errback do |e|
+      EM::IMAP::Client.new(@connection).errback do |e|
         a = true
       end
-      @connection.receive_data "* BYE Test Imap\r\n"
+      @connection.receive_data "* BYE Test IMAP\r\n"
       a.should be_true
     end
 
     it "should fail if the connection receives gibberish" do
       a = false
-      EM::Imap::Client.new(@connection).errback do |e|
+      EM::IMAP::Client.new(@connection).errback do |e|
         a = true
       end
       @connection.receive_data "HTTP 1.1 GET /\r\n"
@@ -38,7 +38,7 @@ describe EM::Imap::Client do
 
     it "should fail if the connection does not complete" do
       a = false
-      EM::Imap::Client.new(@connection).errback do |e|
+      EM::IMAP::Client.new(@connection).errback do |e|
         a = true
       end
       @connection.unbind
@@ -48,7 +48,7 @@ describe EM::Imap::Client do
 
   describe "commands" do
     before :each do
-      @client = EM::Imap::Client.new(@connection)
+      @client = EM::IMAP::Client.new(@connection)
       @connection.receive_data "* OK Ready to test!\r\n"
     end
 

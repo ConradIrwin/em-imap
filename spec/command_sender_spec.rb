@@ -1,10 +1,10 @@
 require 'spec_helper'
 
-describe EM::Imap::CommandSender do
+describe EM::IMAP::CommandSender do
 
   before :each do
     @command_sender = Class.new(EMStub) do
-      include EM::Imap::Connection
+      include EM::IMAP::Connection
     end.new
   end
 
@@ -15,7 +15,7 @@ describe EM::Imap::CommandSender do
         def process; end
       end.new
 
-      @command = EM::Imap::Command.new("AUTHENTICATE", "XDUMMY")
+      @command = EM::IMAP::Command.new("AUTHENTICATE", "XDUMMY")
 
       @command_sender.send_authentication_data(@authenticator, @command)
     end
@@ -69,7 +69,7 @@ describe EM::Imap::CommandSender do
 
   describe "#send_literal" do
     before :each do
-      @command = EM::Imap::Command.new("RUBY0001", "SELECT", ["AHLO"])
+      @command = EM::IMAP::Command.new("RUBY0001", "SELECT", ["AHLO"])
     end
 
     it "should initially only send the size" do
@@ -105,33 +105,33 @@ describe EM::Imap::CommandSender do
 
     it "should raise errors if the command cannot be serialized" do
       lambda {
-        @command_sender.send_command_object(EM::Imap::Command.new("RUBY0001", "IDLE", [@bomb]))
+        @command_sender.send_command_object(EM::IMAP::Command.new("RUBY0001", "IDLE", [@bomb]))
       }.should raise_exception "bomb"
     end
 
     it "should raise errors even if the unserializable object is after a literal" do
       lambda {
-        @command_sender.send_command_object(EM::Imap::Command.new("RUBY0001", "IDLE", ["Literal\r\nString", @bomb]))
+        @command_sender.send_command_object(EM::IMAP::Command.new("RUBY0001", "IDLE", ["Literal\r\nString", @bomb]))
       }.should raise_exception "bomb"
     end
 
     it "should not raise errors if the send_data fails" do
       @command_sender.should_receive(:send_data).and_raise(Errno::ECONNRESET)
       lambda {
-        @command_sender.send_command_object(EM::Imap::Command.new("RUBY0001", "IDLE"))
+        @command_sender.send_command_object(EM::IMAP::Command.new("RUBY0001", "IDLE"))
       }.should_not raise_exception
     end
 
     it "should fail the command if send_data fails" do
       @command_sender.should_receive(:send_data).and_raise(Errno::ECONNRESET)
       a = []
-      command = EM::Imap::Command.new("RUBY0001", "IDLE").errback{ |e| a << e }
+      command = EM::IMAP::Command.new("RUBY0001", "IDLE").errback{ |e| a << e }
       @command_sender.send_command_object(command)
       a.map(&:class).should == [Errno::ECONNRESET]
     end
   end
 
-  describe EM::Imap::CommandSender::LineBuffer do
+  describe EM::IMAP::CommandSender::LineBuffer do
 
     it "should not send anything until the buffer is full" do
       @command_sender.should_not_receive(:send_data)

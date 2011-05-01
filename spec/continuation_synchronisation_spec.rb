@@ -1,9 +1,9 @@
 require 'spec_helper'
 
-describe EM::Imap::ContinuationSynchronisation do
+describe EM::IMAP::ContinuationSynchronisation do
   before :each do
     @connection = Class.new(EMStub) do 
-      include EM::Imap::Connection
+      include EM::IMAP::Connection
     end.new
   end
 

@@ -17,14 +17,14 @@ require 'imap/client'
 $:.shift
 
 module EventMachine
-  module Imap
+  module IMAP
     # Connect to the specified IMAP server, using ssl if applicable.
     #
     # Returns a deferrable that will succeed or fail based on the
     # success of the connection setup phase.
     #
     def self.connect(host, port, ssl=false)
-      Client.new(EventMachine::Imap::Connection.connect(host, port, ssl))
+      Client.new(EventMachine::IMAP::Connection.connect(host, port, ssl))
     end
 
     class Command < Listener

@@ -1,10 +1,10 @@
 require 'spec_helper'
 
-describe EventMachine::Imap::ResponseParser do
+describe EventMachine::IMAP::ResponseParser do
 
   before :each do 
     @response_parser = Class.new(EMStub) do 
-      include EventMachine::Imap::ResponseParser 
+      include EventMachine::IMAP::ResponseParser 
     end.new
   end
 

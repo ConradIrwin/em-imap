@@ -1,11 +1,11 @@
 module EventMachine
-  module Imap
+  module IMAP
     # TODO: Anything that accepts or returns a mailbox name should have UTF7 support.
     class Client
       include EM::Deferrable
       DG.enhance!(self)
 
-      include Imap::Authenticators
+      include IMAP::Authenticators
 
       def initialize(connection)
         @connection = connection.errback{ |e| fail e }.callback{ |response| succeed response }
@@ -54,7 +54,7 @@ module EventMachine
       ## 6.2 Client Commands - Not Authenticated State
 
       # This would start tls negotiations, until this is implemented,
-      # simply pass true as the first parameter to EM::Imap.connect.
+      # simply pass true as the first parameter to EM::IMAP.connect.
       #
       def starttls
         raise NotImplementedError
@@ -67,7 +67,7 @@ module EventMachine
       #  'LOGIN', username, password
       #  'CRAM-MD5', username, password (see RFC 2195)
       #
-      # Though you can add new mechanisms using EM::Imap.add_authenticator,
+      # Though you can add new mechanisms using EM::IMAP.add_authenticator,
       # see for example the gmail_xoauth gem.
       #  
       def authenticate(auth_type, *args)

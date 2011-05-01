@@ -1,5 +1,5 @@
 module EventMachine
-  module Imap
+  module IMAP
     # Intercepts the receive_data event and generates receive_response events
     # with parsed data.
     module ResponseParser
@@ -9,7 +9,7 @@ module EventMachine
         @buffer = ""
       end
 
-      # This is a translation of Net::Imap#get_response
+      # This is a translation of Net::IMAP#get_response
       def receive_data(data)
         @buffer += data
 

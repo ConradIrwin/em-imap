@@ -1,12 +1,12 @@
 module EventMachine
-  module Imap
+  module IMAP
     CRLF = "\r\n"
     module Connection
       include EM::Deferrable
       DG.enhance!(self)
 
-      include Imap::CommandSender
-      include Imap::ResponseParser
+      include IMAP::CommandSender
+      include IMAP::ResponseParser
 
       # Create a new connection to an IMAP server.
       #
@@ -110,7 +110,7 @@ module EventMachine
       end
 
       # receive_response is a higher-level receive_data provided by
-      # EM::Imap::ResponseParser. Each response is a Net::IMAP response
+      # EM::IMAP::ResponseParser. Each response is a Net::IMAP response
       # object. (FIXME)
       def receive_response(response)
         @listeners.each{ |listener| listener.receive_event response }
@@ -144,7 +144,7 @@ module EventMachine
       end
 
       # Provides a next_tag! method to generate unique tags
-      # for an Imap session.
+      # for an IMAP session.
       module TagSequence
         def post_init
           super
@@ -172,8 +172,10 @@ module EventMachine
           super
         end
       end
-      include Imap::Connection::TagSequence
-      include Imap::Connection::Debug
+      include IMAP::Connection::TagSequence
+      def self.debug!
+        include IMAP::Connection::Debug
+      end
     end
   end
 end

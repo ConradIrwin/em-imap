@@ -1,5 +1,5 @@
 module EventMachine
-  module Imap
+  module IMAP
     # The basic IMAP protocol is an unsynchronised exchange of lines,
     # however under some circumstances it is necessary to synchronise
     # so that the server acknowledges each item sent by the client.

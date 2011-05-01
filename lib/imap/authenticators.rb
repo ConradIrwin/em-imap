@@ -1,16 +1,16 @@
 module EventMachine
-  # Makes Net::IMAP.add_authenticator accessible through EM::Imap and instances thereof.
-  # Also provides the authenticator method to EM::Imap::Client to get authenticators
+  # Makes Net::IMAP.add_authenticator accessible through EM::IMAP and instances thereof.
+  # Also provides the authenticator method to EM::IMAP::Client to get authenticators
   # for use in the authentication exchange.
   #
-  module Imap
+  module IMAP
     def self.add_authenticator(klass)
       Net::IMAP.add_authenticator(*args)
     end
 
     module Authenticators
       def add_authenticator(*args)
-        EventMachine::Imap.add_authenticator(*args)
+        EventMachine::IMAP.add_authenticator(*args)
       end
 
       private
