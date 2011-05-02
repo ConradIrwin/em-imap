@@ -351,8 +351,9 @@ module EventMachine
       # EM.timeout(60) { idler.stop }
       #
       def idle(&block)
-        send_command("IDLE").listen(&block).tap do |command|
+        send_command("IDLE").tap do |command|
           @connection.prepare_idle_continuation(command)
+          command.listen(&block) if block_given?
         end
       end
 
