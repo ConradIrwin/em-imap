@@ -5,4 +5,4 @@ class EMStub
   def close_connection; unbind; end
 end
 
-require File.dirname( __FILE__ ) + "/../lib/imap"
+require File.dirname( __FILE__ ) + "/../lib/em-imap"
