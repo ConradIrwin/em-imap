@@ -177,6 +177,7 @@ module EventMachine
       # Succeeds with a hash of attribute name to value returned by the server.
       #
       def status(mailbox, attrs=['MESSAGES', 'RECENT', 'UIDNEXT', 'UIDVALIDITY', 'UNSEEN'])
+        attrs = [attrs] if attrs.is_a?(String)
         one_data_response("STATUS", to_utf7(mailbox), attrs).transform do |response|
           response.data.attr
         end
