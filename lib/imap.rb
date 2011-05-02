@@ -6,14 +6,14 @@ require 'eventmachine'
 require 'deferrable_gratification'
 
 $:.unshift File.dirname( __FILE__ )
-require 'imap/listener'
-require 'imap/continuation_synchronisation'
-require 'imap/command_sender'
-require 'imap/response_parser'
-require 'imap/connection'
+require 'em-imap/listener'
+require 'em-imap/continuation_synchronisation'
+require 'em-imap/command_sender'
+require 'em-imap/response_parser'
+require 'em-imap/connection'
 
-require 'imap/authenticators'
-require 'imap/client'
+require 'em-imap/authenticators'
+require 'em-imap/client'
 $:.shift
 
 module EventMachine
