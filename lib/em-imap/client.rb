@@ -318,7 +318,7 @@ module EventMachine
         store_internal("STORE", seq, name, value)
       end
 
-      # The sames as store, but keyed of UIDs instead of sequence numbers.
+      # The same as store, but keyed off UIDs instead of sequence numbers.
       #
       def uid_store(seq, name, value)
         store_internal("UID", "STORE", seq, name, value)
@@ -328,6 +328,12 @@ module EventMachine
       #
       def copy(seq, mailbox)
         tagged_response("COPY", Net::IMAP::MessageSet.new(seq), to_utf7(mailbox))
+      end
+
+      # The same as copy, but keyed off UIDs instead of sequence numbers.
+      #
+      def uid_copy(seq, mailbox)
+        tagged_response("UID", "COPY", Net::IMAP::MessageSet.new(seq), to_utf7(mailbox))
       end
 
       # The IDLE command allows you to wait for any untagged responses
