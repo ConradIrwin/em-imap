@@ -41,6 +41,19 @@ describe EM::IMAP::Listener do
     a.should == ["callback"]
   end
 
+  it "should not pass events to listeners added in listen blocks" do
+    a = []
+    listener = EM::IMAP::Listener.new.listen do |event|
+      listener.listen do |event|
+        a << event
+      end
+    end
+
+    listener.receive_event 1
+    listener.receive_event 2
+    a.should == [2]
+  end
+
   describe "transform" do
     before :each do
       @bottom = EM::IMAP::Listener.new

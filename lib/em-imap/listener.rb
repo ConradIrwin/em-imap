@@ -97,7 +97,9 @@ module EventMachine
 
       # Pass arguments onto any blocks registered with listen.
       def receive_event(*args, &block)
-        listeners.each{ |l| l.call *args, &block }
+        # NOTE: Take a clone of listeners, so any listeners added by listen
+        # blocks won't receive these events.
+        listeners.clone.each{ |l| l.call *args, &block }
       end
 
       # Register a block to be called when the ListeningDeferrable is stopped.
