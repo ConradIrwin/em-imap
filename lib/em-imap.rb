@@ -28,6 +28,10 @@ module EventMachine
       Client.new(EventMachine::IMAP::Connection.connect(host, port, ssl))
     end
 
+    def self.new(host, port, ssl=false)
+      Client.new(host, port, ssl)
+    end
+
     class Command < Listener
       attr_accessor :tag, :cmd, :args
       def initialize(tag, cmd, args=[], &block)

@@ -80,20 +80,24 @@ module EventMachine
       # Listen for the first response from the server and succeed or fail
       # the connection deferrable.
       def listen_for_greeting
-        hello_listener = add_response_handler do |response|
-          hello_listener.stop
+        add_to_listener_pool(hello_listener)
+        listen_for_bye_response(hello_listener)
+        hello_listener.listen do |response|
+          # TODO: Is this the right condition? I think it can be one of several
+          # possible answers depending on how trusted the connection is, but probably
+          # not *anything* except BYE.
           if response.is_a?(Net::IMAP::UntaggedResponse)
-            if response.name == "BYE"
-              fail Net::IMAP::ByeResponseError.new(response.raw_data)
-            else
-              succeed response
-            end
+            hello_listener.succeed response
           else
-            fail Net::IMAP::ResponseParseError.new(response.raw_data)
+            hello_listener.fail Net::IMAP::ResponseParseError.new(response.raw_data)
           end
         end.errback do |e|
-          fail e
+          hello_listener.fail e
         end
+      end
+
+      def hello_listener
+        @hello_listener ||= Listener.new.errback{ |e| fail_all e }.bothback{ hello_listener.stop }
       end
 
       # Called when the connection is closed.

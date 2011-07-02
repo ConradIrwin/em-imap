@@ -6,12 +6,13 @@ describe EM::IMAP::Client do
     @connection = Class.new(EMStub) do
       include EM::IMAP::Connection
     end.new
+    EM::IMAP::Connection.stub!(:connect).and_return(@connection)
   end
 
   describe "connection" do
     it "should succeed if the connection receives a successful greeting" do
       a = false
-      EM::IMAP::Client.new(@connection).callback do |response|
+      EM::IMAP::Client.new("mail.example.com", 993).connect.callback do |response|
         a = true
       end
       @connection.receive_data "* OK Welcome, test IMAP!\r\n"
@@ -20,7 +21,7 @@ describe EM::IMAP::Client do
 
     it "should fail if the connection receives a BYE" do
       a = false
-      EM::IMAP::Client.new(@connection).errback do |e|
+      EM::IMAP::Client.new("mail.example.com", 993).connect.errback do |e|
         a = true
       end
       @connection.receive_data "* BYE Test IMAP\r\n"
@@ -29,7 +30,7 @@ describe EM::IMAP::Client do
 
     it "should fail if the connection receives gibberish" do
       a = false
-      EM::IMAP::Client.new(@connection).errback do |e|
+      EM::IMAP::Client.new("mail.example.com", 993).connect.errback do |e|
         a = true
       end
       @connection.receive_data "HTTP 1.1 GET /\r\n"
@@ -38,7 +39,7 @@ describe EM::IMAP::Client do
 
     it "should fail if the connection does not complete" do
       a = false
-      EM::IMAP::Client.new(@connection).errback do |e|
+      EM::IMAP::Client.new("mail.example.com", 993).connect.errback do |e|
         a = true
       end
       @connection.unbind
@@ -48,7 +49,8 @@ describe EM::IMAP::Client do
 
   describe "commands" do
     before :each do
-      @client = EM::IMAP::Client.new(@connection)
+      @client = EM::IMAP::Client.new("mail.example.com", 993)
+      @client.connect
       @connection.receive_data "* OK Ready to test!\r\n"
     end
 
@@ -163,7 +165,8 @@ describe EM::IMAP::Client do
 
   describe "multi-command concurrency" do
     before :each do
-      @client = EM::IMAP::Client.new(@connection)
+      @client = EM::IMAP::Client.new("mail.example.com", 993)
+      @client.connect
       @connection.receive_data "* OK Ready to test!\r\n"
     end
 

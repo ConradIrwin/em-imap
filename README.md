@@ -10,7 +10,7 @@ This document tries to introduce concepts of IMAP alongside the facilities of th
 
 ### Connecting
 
-Before you can communicate with an IMAP server, you must first connect to it. There are three connection parameters, the hostname, the port number, and whether to use SSL/TLS. As with every method in EM::IMAP, `EM::IMAP.connect` returns a [deferrable](http://eventmachine.rubyforge.org/docs/DEFERRABLES.html) enhanced by the [deferrable\_gratification](https://github.com/samstokes/deferrable_gratification) library.
+Before you can communicate with an IMAP server, you must first connect to it. There are three connection parameters, the hostname, the port number, and whether to use SSL/TLS. As with every method in EM::IMAP, `EM::IMAP::Client#connect` returns a [deferrable](http://eventmachine.rubyforge.org/docs/DEFERRABLES.html) enhanced by the [deferrable\_gratification](https://github.com/samstokes/deferrable_gratification) library.
 
 For example, to connect to Gmail's IMAP server, you can use the following snippet:
 
@@ -18,8 +18,8 @@ For example, to connect to Gmail's IMAP server, you can use the following snippe
     require 'em-imap'
 
     EM::run do
-      client = EM::IMAP.connect('imap.gmail.com', 993, true)
-      client.errback do |error|
+      client = EM::IMAP.new('imap.gmail.com', 993, true)
+      client.connect.errback do |error|
         puts "Connecting failed: #{error}"
       end.callback do |hello_response|
         puts "Connecting succeeded!"
@@ -34,8 +34,8 @@ There are two authentication mechanisms in IMAP, `LOGIN` and `AUTHENTICATE`, exp
 
 Extending our previous example to also log in to Gmail:
 
-    client = EM::IMAP.connect('imap.gmail.com', 993, true)
-    client.bind! do
+    client = EM::IMAP.new('imap.gmail.com', 993, true)
+    client.connect.bind! do
       client.login("conrad.irwin@gmail.com", ENV["GMAIL_PASSWORD"])
     end.callback do
       puts "Connected and logged in!"
@@ -49,8 +49,8 @@ The `.authenticate` method is more advanced and uses the same extensible mechani
 
 Once the authentication has completed successfully, you can perform IMAP commands that don't require a currently selected mailbox. For example to get a list of the names of all Gmail mailboxes (including labels):
 
-    client = EM::IMAP.connect('imap.gmail.com', 993, true)
-    client.bind! do
+    client = EM::IMAP.new('imap.gmail.com', 993, true)
+    client.connect.bind! do
       client.login("conrad.irwin@gmail.com", ENV["GMAIL_PASSWORD"])
     end.bind! do
       client.list
@@ -68,8 +68,8 @@ In order to do useful things which actual messages, you need to first select a m
 
 For example to search for all emails relevant to em-imap in Gmail:
 
-    client = EM::IMAP.connect('imap.gmail.com', 993, true)
-    client.bind! do
+    client = EM::IMAP.new('imap.gmail.com', 993, true)
+    client.connect.bind! do
       client.login("conrad.irwin@gmail.com", ENV["GMAIL_PASSWORD"])
     end.bind! do
       client.select('[Google Mail]/All Mail')
@@ -83,8 +83,8 @@ For example to search for all emails relevant to em-imap in Gmail:
 
 Once you have a list of message sequence numbers, as returned by search, you can actually read the emails with `.fetch`:
 
-    client = EM::IMAP.connect('imap.gmail.com', 993, true)
-    client.bind! do
+    client = EM::IMAP.new('imap.gmail.com', 993, true)
+    client.connect.bind! do
       client.login("conrad.irwin@gmail.com", ENV["GMAIL_PASSWORD"])
     end.bind! do
       client.select('[Google Mail]/All Mail')
@@ -148,7 +148,8 @@ If you want to receive server responses at any time, you can call `.add_response
 
 If you want to send commands without waiting for previous replies, you can also do so. em-imap handles the few cases where this is not permitted (for example, during an IDLE command) by queueing the command until the connection becomes available again. If you do this, bear in mind that any blocks that are listening on the connection may receive responses from multiple commands interleaved.
 
-    client = EM::Imap.connect('imap.gmail.com', 993, true).callback do
+    client = EM::Imap.new('imap.gmail.com', 993, true)
+    client.connect.callback do
       logger_in = client.login('conrad.irwin@gmail.com', ENV["GMAIL_PASSWORD"])
       selecter = client.select('[Google Mail]/All Mail')
       searcher = client.search('from:conrad@rapportive.com').callback do |results|

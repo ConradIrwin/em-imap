@@ -7,8 +7,16 @@ module EventMachine
 
       include IMAP::Authenticators
 
-      def initialize(connection)
-        @connection = connection.errback{ |e| fail e }.callback{ |response| succeed response }
+      def initialize(host, port, usessl=false)
+        @connect_args=[host, port, usessl]
+      end
+
+      def connect
+        @connection = EM::IMAP::Connection.connect(*@connect_args)
+        @connection.errback{ |e| fail e }.
+                    callback{ |*args| succeed *args }
+
+        @connection.hello_listener
       end
 
       def disconnect
