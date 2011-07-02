@@ -8,6 +8,7 @@ require 'deferrable_gratification'
 $:.unshift File.dirname( __FILE__ )
 require 'em-imap/listener'
 require 'em-imap/continuation_synchronisation'
+require 'em-imap/formatter'
 require 'em-imap/command_sender'
 require 'em-imap/response_parser'
 require 'em-imap/connection'
