@@ -25,6 +25,38 @@ module EventMachine
         end
       end
 
+      def post_init
+        @listeners = []
+        super
+        listen_for_failure
+        listen_for_greeting
+      end
+
+      # This listens for the IMAP connection to have been set up. This should
+      # be shortly after the TCP connection is available, once we've received
+      # a greeting from the server.
+      def listen_for_greeting
+        add_to_listener_pool(hello_listener)
+        hello_listener.listen do |response|
+          # TODO: Is this the right condition? I think it can be one of several
+          # possible answers depending on how trusted the connection is, but probably
+          # not *anything* except BYE.
+          if response.is_a?(Net::IMAP::UntaggedResponse) && response.name != "BYE"
+            hello_listener.succeed response
+          else
+            hello_listener.fail Net::IMAP::ResponseParseError.new(response.raw_data)
+          end
+        end.errback do |e|
+          hello_listener.fail e
+        end
+      end
+
+      # Returns a Listener that is active during connection setup, and which is succeeded
+      # or failed as soon as we've received a greeting from the server.
+      def hello_listener
+        @hello_listener ||= Listener.new.errback{ |e| fail e }.bothback{ hello_listener.stop }
+      end
+
       # Send the command, with the given arguments, to the IMAP server.
       #
       # @param cmd, the name of the command to send (a string)
@@ -69,60 +101,6 @@ module EventMachine
         end
       end
 
-      def post_init
-        @listeners = []
-        super
-        listen_for_failure
-        listen_for_greeting
-      end
-
-      # Listen for the first response from the server and succeed or fail
-      # the connection deferrable.
-      def listen_for_greeting
-        add_to_listener_pool(hello_listener)
-        hello_listener.listen do |response|
-          # TODO: Is this the right condition? I think it can be one of several
-          # possible answers depending on how trusted the connection is, but probably
-          # not *anything* except BYE.
-          if response.is_a?(Net::IMAP::UntaggedResponse) && response.name != "BYE"
-            hello_listener.succeed response
-          else
-            hello_listener.fail Net::IMAP::ResponseParseError.new(response.raw_data)
-          end
-        end.errback do |e|
-          hello_listener.fail e
-        end
-      end
-
-      def hello_listener
-        @hello_listener ||= Listener.new.errback{ |e| fail e }.bothback{ hello_listener.stop }
-      end
-
-      # Called when the connection is closed.
-      # TODO: Figure out how to send a useful error...
-      def unbind
-        @unbound = true
-        fail EOFError.new("Connection to IMAP server was unbound")
-      end
-
-      def listen_for_failure
-        errback do |error|
-          # NOTE: Take a shallow clone of the listeners here so that we get guaranteed
-          # behaviour. We want to fail any listeners that may be added by the errbacks
-          # of other listeners.
-          @listeners.clone.each{ |listener| listener.fail error } while @listeners.size > 0
-          close_connection unless @unbound
-        end
-
-        # If we receive a BYE response from the server, then we're not going
-        # to hear any more, so we fail all our listeners.
-        add_response_handler do |response|
-          if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == "BYE"
-            fail Net::IMAP::ByeResponseError.new(response.raw_data)
-          end
-        end
-      end
-
       def add_to_listener_pool(listener)
         @listeners << listener.bothback{ @listeners.delete listener }
       end
@@ -149,6 +127,35 @@ module EventMachine
             else
               command.succeed response
             end
+          end
+        end
+      end
+
+      # Called when the connection is closed.
+      # TODO: Figure out how to send a useful error...
+      def unbind
+        @unbound = true
+        fail EOFError.new("Connection to IMAP server was unbound")
+      end
+
+      # Attach life-long listeners on various conditions that we want to treat as connection
+      # errors. When such an error occurs, we want to fail all the currently pending commands
+      # so that the user of the library doesn't have to subscribe to more than one stream
+      # of errors.
+      def listen_for_failure
+        errback do |error|
+          # NOTE: Take a shallow clone of the listeners here so that we get guaranteed
+          # behaviour. We want to fail any listeners that may be added by the errbacks
+          # of other listeners.
+          @listeners.clone.each{ |listener| listener.fail error } while @listeners.size > 0
+          close_connection unless @unbound
+        end
+
+        # If we receive a BYE response from the server, then we're not going
+        # to hear any more, so we fail all our listeners.
+        add_response_handler do |response|
+          if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == "BYE"
+            fail Net::IMAP::ByeResponseError.new(response.raw_data)
           end
         end
       end
