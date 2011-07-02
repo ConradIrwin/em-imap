@@ -48,7 +48,7 @@ describe EventMachine::IMAP::ResponseParser do
   end
 
   it "should fail the connection when invalid data is received" do
-    @response_parser.should_receive(:fail_all).with(an_instance_of(Net::IMAP::ResponseParseError))
+    @response_parser.should_receive(:fail).with(an_instance_of(Net::IMAP::ResponseParseError))
     @response_parser.receive_data "lol ??\r\n"
   end
 end

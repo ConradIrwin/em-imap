@@ -39,15 +39,12 @@ module EventMachine
       # Callback used by receive data.
       def receive_response(response); end
 
-      # Callback used if something goes wrong.
-      def fail_all(error); end
-
       private
 
       def parse(line)
         @parser.parse(line)
       rescue Net::IMAP::ResponseParseError => e
-        fail_all e
+        fail e
       end
     end
   end

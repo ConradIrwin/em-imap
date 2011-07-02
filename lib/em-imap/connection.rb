@@ -75,6 +75,7 @@ module EventMachine
         @listeners = Set.new
         super
         listen_for_greeting
+        listen_for_failure
       end
 
       # Listen for the first response from the server and succeed or fail
@@ -97,21 +98,24 @@ module EventMachine
       end
 
       def hello_listener
-        @hello_listener ||= Listener.new.errback{ |e| fail_all e }.bothback{ hello_listener.stop }
+        @hello_listener ||= Listener.new.errback{ |e| fail e }.bothback{ hello_listener.stop }
       end
 
       # Called when the connection is closed.
       # TODO: Figure out how to send a useful error...
       def unbind
-        fail_all EOFError.new("Connection to IMAP server was unbound"), true
+        @unbound = true
+        fail EOFError.new("Connection to IMAP server was unbound")
       end
 
-      def fail_all(error, closed=false)
-        # NOTE: Take a shallow clone of the listeners here so that we get guaranteed
-        # behaviour. We want to fail any listeners that may be added by the errbacks
-        # of other listeners.
-        @listeners.clone.each{ |listener| listener.fail error } while @listeners.size > 0
-        close_connection unless closed
+      def listen_for_failure
+        errback do |error|
+          # NOTE: Take a shallow clone of the listeners here so that we get guaranteed
+          # behaviour. We want to fail any listeners that may be added by the errbacks
+          # of other listeners.
+          @listeners.clone.each{ |listener| listener.fail error } while @listeners.size > 0
+          close_connection unless @unbound
+        end
       end
 
       def add_to_listener_pool(listener)

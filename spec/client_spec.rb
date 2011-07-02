@@ -175,7 +175,7 @@ describe EM::IMAP::Client do
       @client.create("Encyclop\xc3\xa6dia").errback{ |e| a = true }
       @client.create("Brittanica").errback{ |e| b = true }
       @connection.should_receive(:close_connection).once
-      @connection.fail_all EOFError.new("Testing error")
+      @connection.fail EOFError.new("Testing error")
       a.should == true
       b.should == true
     end
@@ -187,7 +187,7 @@ describe EM::IMAP::Client do
           a = true
         end
       end
-      @connection.fail_all EOFError.new("Testing error")
+      @connection.fail EOFError.new("Testing error")
       a.should == true
     end
 
