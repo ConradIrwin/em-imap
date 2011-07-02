@@ -3,39 +3,19 @@ module EventMachine
     # Provides a send_command_object method that serializes command objects
     # and uses send_data on them. This is the ugly sister to ResponseParser.
     module CommandSender
-      # Ugly hack to get at the Net::IMAP string formatting routines.
-      # (FIXME: Extract into its own module and rewrite)
-      class FakeNetIMAP < Net::IMAP
-        def initialize(command, imap_connection)
-          @command = command
-          @connection = imap_connection
-        end
-
-        def put_string(str)
-          @connection.send_string str, @command
-        end
-
-        def send_literal(str)
-          @connection.send_literal str, @command
-        end
-
-        public :send_data
-      end
-
       # This is a method that synchronously converts the command into fragments
       # of string.
       #
       # If you pass something that cannot be serialized, an exception will be raised.
       # If however, something fails at the socket level, the command will be failed.
       def send_command_object(command)
-        sender = FakeNetIMAP.new(command, self)
-
-        sender.put_string "#{command.tag} #{command.cmd}"
-        command.args.each do |arg|
-          sender.put_string " "
-          sender.send_data arg
+        Formatter.format(command) do |to_send|
+          if to_send.is_a? Formatter::Literal
+            send_literal to_send.str, command
+          else
+            send_string  to_send, command
+          end
         end
-        sender.put_string CRLF
       end
 
       # See Net::IMAP#authenticate
