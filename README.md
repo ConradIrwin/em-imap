@@ -173,6 +173,10 @@ Before version 1, at least the following changes should be made:
 4. Support SORT and THREAD.
 5. Put the in-line documentation into a real format.
 
+### Breaking Changes
+
+Between Version 0.1(.x) and 0.2, the connection setup API changed. Previously you would call `EM::IMAP.connect`, now that is broken into two steps: `EM::IMAP.new` and `EM::IMAP::Client#connect` as documented above. This makes it less likely people will write `client = connect.bind!` by accident, and allows you to bind to the `errback` of the connection as a whole should you wish to.
+
 ## Meta-foo
 
 Em-imap is made available under the MIT license, see LICENSE.MIT for details
