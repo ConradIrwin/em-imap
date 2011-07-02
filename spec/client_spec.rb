@@ -96,16 +96,6 @@ describe EM::IMAP::Client do
       @connection.receive_data "* RUBY0001 OK Success\r\n"
     end
 
-    it "should fail all concurrent commands if something goes wrong" do
-      a = b = false
-      @client.create("Encyclop\xc3\xa6dia").errback{ |e| a = true }
-      @client.create("Brittanica").errback{ |e| b = true }
-      @connection.should_receive(:close_connection).once
-      @connection.fail_all EOFError.new("Testing error")
-      a.should == true
-      b.should == true
-    end
-
     describe "login" do
       it "should callback on a successful login" do
         a = nil
@@ -149,6 +139,23 @@ describe EM::IMAP::Client do
         @connection.receive_data "* BYE LOGOUT Requested\r\n"
         @connection.receive_data "RUBY0002 OK Success\r\n"
       end
+    end
+  end
+
+  describe "multi-command concurrency" do
+    before :each do
+      @client = EM::IMAP::Client.new(@connection)
+      @connection.receive_data "* OK Ready to test!\r\n"
+    end
+
+    it "should fail all concurrent commands if something goes wrong" do
+      a = b = false
+      @client.create("Encyclop\xc3\xa6dia").errback{ |e| a = true }
+      @client.create("Brittanica").errback{ |e| b = true }
+      @connection.should_receive(:close_connection).once
+      @connection.fail_all EOFError.new("Testing error")
+      a.should == true
+      b.should == true
     end
   end
 end
