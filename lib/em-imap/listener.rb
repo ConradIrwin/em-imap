@@ -92,6 +92,7 @@ module EventMachine
       # Register a block to be called when receive_event is called.
       def listen(&block)
         listeners << block
+        stopback{ |*args| listeners.delete block }
         self
       end
 

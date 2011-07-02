@@ -54,6 +54,32 @@ describe EM::IMAP::Listener do
     a.should == [2]
   end
 
+  it "should not propagate events after stopped" do
+    a = []
+
+    listener = EM::IMAP::Listener.new.listen do |event|
+      a << event
+    end
+
+    listener.receive_event 1
+    listener.stop
+    listener.receive_event 2
+    a.should == [1]
+  end
+
+  it "should continue propagating events started before stopped" do
+    a = []
+    listener = EM::IMAP::Listener.new.listen do |event|
+      listener.stop
+    end.listen do |event|
+      a << event
+    end
+
+    listener.receive_event 1
+    listener.receive_event 2
+    a.should == [1]
+  end
+
   describe "transform" do
     before :each do
       @bottom = EM::IMAP::Listener.new
