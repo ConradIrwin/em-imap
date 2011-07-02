@@ -59,8 +59,12 @@ module EventMachine
       # continuation responses onto the currently awaiting block.
       def listen_for_continuation
         add_response_handler do |response|
-          if awaiting_continuation? && response.is_a?(Net::IMAP::ContinuationRequest)
-            @awaiting_continuation.receive_event response
+          if response.is_a?(Net::IMAP::ContinuationRequest)
+            if awaiting_continuation?
+              @awaiting_continuation.receive_event response
+            else
+              fail_all Net::IMAP::ResponseError.new("Unexpected continuation response from server")
+            end
           end
         end
       end

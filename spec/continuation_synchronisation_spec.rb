@@ -85,4 +85,9 @@ describe EM::IMAP::ContinuationSynchronisation do
     @connection.receive_response response2
     a.should == [response1]
   end
+
+  it "should fail the connection when an unexpected continuation response is received" do
+    @connection.should_receive(:fail_all).with(an_instance_of(Net::IMAP::ResponseError))
+    @connection.receive_response Net::IMAP::ContinuationRequest.new("hehe")
+  end
 end
