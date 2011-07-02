@@ -72,7 +72,7 @@ module EventMachine
       end
 
       def post_init
-        @listeners = Set.new
+        @listeners = []
         super
         listen_for_greeting
         listen_for_failure
