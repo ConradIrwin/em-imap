@@ -97,12 +97,14 @@ module EventMachine
       end
 
       # Called when the connection is closed.
-      # If there are any listeners left, we fail them.
-      # (TODO: Should we actually succeed them if the connection was
-      # explicitly closed by us?)
       # TODO: Figure out how to send a useful error...
       def unbind
-        @listeners.each{ |listener| listener.fail EOFError.new("Connection to IMAP server was unbound") }
+        fail_all EOFError.new("Connection to IMAP server was unbound"), true
+      end
+
+      def fail_all(error, closed=false)
+        @listeners.each{ |listener| listener.fail error }
+        close_connection unless closed
       end
 
       def add_to_listener_pool(listener)

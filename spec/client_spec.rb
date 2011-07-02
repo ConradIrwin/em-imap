@@ -96,6 +96,16 @@ describe EM::IMAP::Client do
       @connection.receive_data "* RUBY0001 OK Success\r\n"
     end
 
+    it "should fail all concurrent commands if something goes wrong" do
+      a = b = false
+      @client.create("Encyclop\xc3\xa6dia").errback{ |e| a = true }
+      @client.create("Brittanica").errback{ |e| b = true }
+      @connection.should_receive(:close_connection).once
+      @connection.fail_all EOFError.new("Testing error")
+      a.should == true
+      b.should == true
+    end
+
     describe "login" do
       it "should callback on a successful login" do
         a = nil
