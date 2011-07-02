@@ -48,7 +48,6 @@ module EventMachine
         Command.new(next_tag!, cmd, args).tap do |command|
           add_to_listener_pool(command)
           listen_for_tagged_response(command)
-          listen_for_bye_response(command)
           send_command_object(command)
         end
       end
@@ -67,27 +66,25 @@ module EventMachine
         Listener.new(&block).tap do |listener|
           listener.stopback{ listener.succeed }
           add_to_listener_pool(listener)
-          listen_for_bye_response(listener)
         end
       end
 
       def post_init
         @listeners = []
         super
-        listen_for_greeting
         listen_for_failure
+        listen_for_greeting
       end
 
       # Listen for the first response from the server and succeed or fail
       # the connection deferrable.
       def listen_for_greeting
         add_to_listener_pool(hello_listener)
-        listen_for_bye_response(hello_listener)
         hello_listener.listen do |response|
           # TODO: Is this the right condition? I think it can be one of several
           # possible answers depending on how trusted the connection is, but probably
           # not *anything* except BYE.
-          if response.is_a?(Net::IMAP::UntaggedResponse)
+          if response.is_a?(Net::IMAP::UntaggedResponse) && response.name != "BYE"
             hello_listener.succeed response
           else
             hello_listener.fail Net::IMAP::ResponseParseError.new(response.raw_data)
@@ -115,6 +112,14 @@ module EventMachine
           # of other listeners.
           @listeners.clone.each{ |listener| listener.fail error } while @listeners.size > 0
           close_connection unless @unbound
+        end
+
+        # If we receive a BYE response from the server, then we're not going
+        # to hear any more, so we fail all our listeners.
+        add_response_handler do |response|
+          if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == "BYE"
+            fail Net::IMAP::ByeResponseError.new(response.raw_data)
+          end
         end
       end
 
@@ -144,16 +149,6 @@ module EventMachine
             else
               command.succeed response
             end
-          end
-        end
-      end
-
-      # If we receive a BYE response from the server, then we're not going
-      # to hear any more, so we fail all our listeners.
-      def listen_for_bye_response(listener)
-        listener.listen do |response|
-          if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == "BYE"
-            listener.fail Net::IMAP::ByeResponseError.new(response.raw_data)
           end
         end
       end
