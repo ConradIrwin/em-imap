@@ -6,6 +6,7 @@ describe EM::IMAP::CommandSender do
     @command_sender = Class.new(EMStub) do
       include EM::IMAP::Connection
     end.new
+    @command_sender.receive_data("* OK Ready to test!\r\n")
   end
 
   describe "#send_authentication_data" do

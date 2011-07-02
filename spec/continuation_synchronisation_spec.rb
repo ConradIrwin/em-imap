@@ -5,6 +5,7 @@ describe EM::IMAP::ContinuationSynchronisation do
     @connection = Class.new(EMStub) do 
       include EM::IMAP::Connection
     end.new
+    @connection.receive_data "* OK Ready to test!\r\n"
   end
 
   it "should allow things to happen when nothing is waiting" do
