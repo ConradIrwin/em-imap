@@ -96,6 +96,25 @@ describe EM::IMAP::Client do
       @connection.receive_data "* RUBY0001 OK Success\r\n"
     end
 
+    it "should execute an IDLE correctly" do
+      stopped = false
+      received = nil
+      @connection.should_receive(:send_data).with("RUBY0001 IDLE\r\n")
+      idler = @client.idle do |response|
+        received = response
+      end.callback do
+        stopped = true
+      end
+      @connection.receive_data("+ idling\r\n")
+      received.should be_a Net::IMAP::ContinuationRequest
+
+      @connection.should_receive(:send_data).with("DONE\r\n")
+      idler.stop
+      @connection.receive_data("RUBY0001 OK IDLE terminated (Success)\r\n")
+      received.should be_a Net::IMAP::TaggedResponse
+      stopped.should be_true
+    end
+
     describe "login" do
       it "should callback on a successful login" do
         a = nil
