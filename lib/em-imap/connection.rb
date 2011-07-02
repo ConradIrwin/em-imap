@@ -20,7 +20,7 @@ module EventMachine
       #                     first response was BYE.
       #
       def self.connect(host, port, ssl=false)
-        conn = EventMachine.connect(host, port, self).tap do |conn|
+        EventMachine.connect(host, port, self).tap do |conn|
           conn.start_tls if ssl
         end
       end
