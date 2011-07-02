@@ -103,7 +103,10 @@ module EventMachine
       end
 
       def fail_all(error, closed=false)
-        @listeners.each{ |listener| listener.fail error }
+        # NOTE: Take a shallow clone of the listeners here so that we get guaranteed
+        # behaviour. We want to fail any listeners that may be added by the errbacks
+        # of other listeners.
+        @listeners.clone.each{ |listener| listener.fail error } while @listeners.size > 0
         close_connection unless closed
       end
 
@@ -115,7 +118,9 @@ module EventMachine
       # EM::IMAP::ResponseParser. Each response is a Net::IMAP response
       # object. (FIXME)
       def receive_response(response)
-        @listeners.each{ |listener| listener.receive_event response }
+        # NOTE: Take a shallow clone of the listeners so that if receiving an
+        # event causes a new listener to be added, it won't receive this response!
+        @listeners.clone.each{ |listener| listener.receive_event response }
       end
 
       # Await the response that marks the completion of this command,

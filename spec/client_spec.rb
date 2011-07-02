@@ -157,5 +157,31 @@ describe EM::IMAP::Client do
       a.should == true
       b.should == true
     end
+
+    it "should fail any commands inserted by errbacks of commands on catastrophic failure" do
+      a = false
+      @client.create("Encyclop\xc3\xa6dia").errback do |e|
+        @client.logout.errback do
+          a = true
+        end
+      end
+      @connection.fail_all EOFError.new("Testing error")
+      a.should == true
+    end
+
+    it "should not pass response objects to listeners added in callbacks" do
+      rs = []
+      @connection.should_receive(:send_data).with("RUBY0001 SELECT \"[Google Mail]/All Mail\"\r\n")
+      @client.select("[Google Mail]/All Mail").callback do |response|
+        @connection.should_receive(:send_data).with("RUBY0002 IDLE\r\n")
+        @client.idle do |r|
+          rs << r
+        end
+      end
+      @connection.receive_data "RUBY0001 OK [READ-WRITE] [Google Mail]/All Mail selected. (Success)\r\n"
+      rs.length.should == 0
+      @connection.receive_data "+ idling\r\n"
+      rs.length.should == 1
+    end
   end
 end
