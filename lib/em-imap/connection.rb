@@ -121,9 +121,9 @@ module EventMachine
           if response.is_a?(Net::IMAP::TaggedResponse) && response.tag == command.tag
             case response.name
             when "NO"
-              command.fail Net::IMAP::NoResponseError.new(response.data.text)
+              command.fail Net::IMAP::NoResponseError.new((RUBY_VERSION[0,3] == "1.8" ? response.data.text : response))
             when "BAD"
-              command.fail Net::IMAP::BadResponseError.new(response.data.text)
+              command.fail Net::IMAP::BadResponseError.new((RUBY_VERSION[0,3] == "1.8" ? response.data.text : response))
             else
               command.succeed response
             end
