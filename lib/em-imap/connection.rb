@@ -44,7 +44,7 @@ module EventMachine
           if response.is_a?(Net::IMAP::UntaggedResponse) && response.name != "BYE"
             hello_listener.succeed response
           else
-            hello_listener.fail Net::IMAP::ResponseParseError.new(response.raw_data)
+            hello_listener.fail Net::IMAP::ResponseParseError.new((RUBY_VERSION[0,3] == "1.8" ? response.raw_data : response))
           end
         end.errback do |e|
           hello_listener.fail e
@@ -121,9 +121,9 @@ module EventMachine
           if response.is_a?(Net::IMAP::TaggedResponse) && response.tag == command.tag
             case response.name
             when "NO"
-              command.fail Net::IMAP::NoResponseError.new(response.data.text)
+              command.fail Net::IMAP::NoResponseError.new((RUBY_VERSION[0,3] == "1.8" ? response.data.text : response))
             when "BAD"
-              command.fail Net::IMAP::BadResponseError.new(response.data.text)
+              command.fail Net::IMAP::BadResponseError.new((RUBY_VERSION[0,3] == "1.8" ? response.data.text : response))
             else
               command.succeed response
             end
@@ -155,7 +155,7 @@ module EventMachine
         # to hear any more, so we fail all our listeners.
         add_response_handler do |response|
           if response.is_a?(Net::IMAP::UntaggedResponse) && response.name == "BYE"
-            fail Net::IMAP::ByeResponseError.new(response.raw_data)
+            fail Net::IMAP::ByeResponseError.new((RUBY_VERSION[0,3] == "1.8" ? response.raw_data : response))
           end
         end
       end
