@@ -1,4 +1,3 @@
-require 'net/imap'
 require 'set'
 
 require 'rubygems'
@@ -6,6 +5,7 @@ require 'eventmachine'
 require 'deferrable_gratification'
 
 $:.unshift File.dirname( __FILE__ )
+require 'net/imap'
 require 'em-imap/listener'
 require 'em-imap/continuation_synchronisation'
 require 'em-imap/formatter'
