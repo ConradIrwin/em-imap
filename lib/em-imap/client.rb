@@ -371,20 +371,50 @@ module EventMachine
 
       private
 
-      # Convert a string to the modified UTF-7 required by IMAP for mailbox naming.
-      # See RFC 3501 Section 5.1.3 for more information.
+      # Decode a string from modified UTF-7 format to UTF-8.
       #
-      def to_utf7(text)
-        Net::IMAP.encode_utf7(text)
+      # UTF-7 is a 7-bit encoding of Unicode [UTF7].  IMAP uses a
+      # slightly modified version of this to encode mailbox names
+      # containing non-ASCII characters; see [IMAP] section 5.1.3.
+      #
+      # Net::IMAP does _not_ automatically encode and decode
+      # mailbox names to and from utf7.
+      def to_utf8(s)
+        return force_encoding(s.gsub(/&(.*?)-/n) {
+          if $1.empty?
+            "&"
+          else
+            base64 = $1.tr(",", "/")
+            x = base64.length % 4
+            if x > 0
+              base64.concat("=" * (4 - x))
+            end
+            base64.unpack("m")[0].unpack("n*").pack("U*")
+          end
+        }, "UTF-8")
       end
 
-      # Convert a string from the modified UTF-7 required by IMAP for mailbox naming.
-      # See RFC 3501 Section 5.1.3 for more information.
-      #
-      def to_utf8(text)
-        Net::IMAP.decode_utf7(text)
+      # Encode a string from UTF-8 format to modified UTF-7.
+      def to_utf7(s)
+        return force_encoding(force_encoding(s, 'UTF-8').gsub(/(&)|([^\x20-\x7e]+)/u) {
+          if $1
+            "&-"
+          else
+            base64 = [$&.unpack("U*").pack("n*")].pack("m")
+            "&" + base64.delete("=\n").tr("/", ",") + "-"
+          end
+        }, "ASCII-8BIT")
       end
-      
+
+      # FIXME: I haven't thought through the ramifications of this yet.
+      def force_encoding(s, encoding)
+        if s.respond_to?(:force_encoding)
+          s.force_encoding(encoding)
+        else
+          s
+        end
+      end
+
       # Send a command that should return a deferrable that succeeds with
       # a tagged_response.
       #
