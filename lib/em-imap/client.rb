@@ -486,7 +486,7 @@ module EventMachine
           when "*", -1, Range
             Net::IMAP::MessageSet.new(arg)
           when Array
-            if Array.all?{ |item| item.is_a?(Number) || item.is_a?(Range) }
+            if arg.inject(true){|bool,item| bool and (item.is_a?(Integer) or item.is_a?(Range))}
               Net::IMAP::MessageSet.new(arg)
             else
               normalize_search_criteria(arg)
