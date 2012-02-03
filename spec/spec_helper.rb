@@ -5,4 +5,5 @@ class EMStub
   def close_connection; unbind; end
 end
 
+require 'plymouth'
 require File.dirname( __FILE__ ) + "/../lib/em-imap"

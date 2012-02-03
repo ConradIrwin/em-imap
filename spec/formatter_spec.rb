@@ -68,6 +68,7 @@ describe EM::IMAP::Formatter do
   end
 
   it "should format complex commands correctly" do
+    raise "yamn"
     @format.call(EM::IMAP::Command.new('RUBY1234', 'FETCH', [[Net::IMAP::MessageSet.new([1,2,3])], 'BODY'])).should == ["RUBY1234 FETCH (1,2,3) BODY\r\n"]
   end
 end
