@@ -310,7 +310,7 @@ module EventMachine
       # The same as fetch, but keyed of UIDs instead of sequence numbers.
       #
       def uid_fetch(seq, attr="FULL")
-        fetch_internal("UID", "FETCH", seq, attr)
+        fetch_internal("UID FETCH", seq, attr)
       end
 
       # Update the flags on a message.
@@ -489,7 +489,7 @@ module EventMachine
 
         set = Net::IMAP::MessageSet.new(set)
 
-        multi_data_response(cmd, set, attr).transform do |untagged_responses|
+        collect_untagged_responses('FETCH', cmd, set, attr).transform do |untagged_responses|
           untagged_responses.map(&:data)
         end
       end

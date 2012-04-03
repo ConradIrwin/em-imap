@@ -161,6 +161,28 @@ describe EM::IMAP::Client do
         @connection.receive_data "RUBY0002 OK Success\r\n"
       end
     end
+
+    describe "uid_fetch" do
+      before :each do
+        @connection.should_receive(:send_data).with("RUBY0001 LOGIN conrad password\r\n")
+        @client.login('conrad', 'password')
+        @connection.receive_data "RUBY0001 OK conrad authenticated\r\n"
+        @connection.should_receive(:send_data).with("RUBY0002 SELECT Inbox\r\n")
+        @client.select('Inbox')
+        @connection.receive_data "RUBY0002 OK Inbox selected. (Success)\r\n"
+      end
+
+      it "should succeed" do
+        a = nil
+        @connection.should_receive(:send_data).with("RUBY0003 UID FETCH 631 ALL\r\n")
+        @client.uid_fetch(631, 'ALL').callback{ |r| a = r }
+        @connection.receive_data "* 1 FETCH (UID 631 ENVELOPE (\"Tue, 21 Feb 2012 03:48:02 +0000\" \"Wiktionary Word of the Day is down\" ((\"Robbie Pamely\" NIL \"rpamely\" \"gmail.com\")) ((\"Robbie Pamely\" NIL \"rpamely\" \"gmail.com\")) ((\"Robbie Pamely\" NIL \"rpamely\" \"gmail.com\")) ((NIL NIL \"enwikt\" \"toolserver.org\")) NIL NIL NIL \"<CAC1x9c5PL4saRbXYst7B4_dMFJ3iF6C_ux4TArWjzNkrOttBug@mail.gmail.com>\") FLAGS (\\Flagged \\Seen) INTERNALDATE \"21-Feb-2012 03:48:30 +0000\" RFC822.SIZE 5957)\r\n"
+        @connection.receive_data "RUBY0003 OK Success\r\n"
+
+        a.size.should == 1
+        a.first.attr['ENVELOPE'].from.first.name.should == "Robbie Pamely"
+      end
+    end
   end
 
   describe "multi-command concurrency" do
