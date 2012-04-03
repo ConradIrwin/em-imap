@@ -162,7 +162,7 @@ describe EM::IMAP::Client do
       end
     end
 
-    describe "uid_fetch" do
+    describe "in inbox" do
       before :each do
         @connection.should_receive(:send_data).with("RUBY0001 LOGIN conrad password\r\n")
         @client.login('conrad', 'password')
@@ -172,7 +172,7 @@ describe EM::IMAP::Client do
         @connection.receive_data "RUBY0002 OK Inbox selected. (Success)\r\n"
       end
 
-      it "should succeed" do
+      it "should be able to run a uid_fetch" do
         a = nil
         @connection.should_receive(:send_data).with("RUBY0003 UID FETCH 631 ALL\r\n")
         @client.uid_fetch(631, 'ALL').callback{ |r| a = r }
@@ -181,6 +181,15 @@ describe EM::IMAP::Client do
 
         a.size.should == 1
         a.first.attr['ENVELOPE'].from.first.name.should == "Robbie Pamely"
+      end
+
+      it "should be able to run a uid_search" do
+        a = nil
+        @connection.should_receive(:send_data).with("RUBY0003 UID SEARCH CHARSET UTF-8 TEXT Robbie\r\n")
+        @client.uid_search('CHARSET', 'UTF-8', 'TEXT', 'Robbie').callback{ |r| a = r }
+        @connection.receive_data "* SEARCH 631\r\nRUBY0003 OK SEARCH completed (Success)\r\n"
+
+        a.should == [631]
       end
     end
   end

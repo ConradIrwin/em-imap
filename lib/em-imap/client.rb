@@ -257,13 +257,13 @@ module EventMachine
       # @succeed A list of message sequence numbers.
       #
       def search(*args)
-        search_internal(["SEARCH"], *args)
+        search_internal("SEARCH", *args)
       end
 
       # The same as search, but succeeding with a list of UIDs not sequence numbers.
       #
       def uid_search(*args)
-        search_internal(["UID", "SEARCH"], *args)
+        search_internal("UID SEARCH", *args)
       end
 
       # SORT and THREAD (like SEARCH) from http://tools.ietf.org/search/rfc5256
@@ -504,8 +504,9 @@ module EventMachine
       end
 
       def search_internal(command, *args)
-        command += normalize_search_criteria(args)
-        one_data_response(*command).transform{ |untagged_response| untagged_response.data }
+        collect_untagged_responses('SEARCH', command, *normalize_search_criteria(args)).transform do |untagged_responses|
+          untagged_responses.last.data
+        end
       end
 
       # Recursively find all the message sets in the arguments and convert them so that
