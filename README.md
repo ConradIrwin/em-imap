@@ -1,4 +1,4 @@
-An [EventMachine](http://eventmachine.org/) based [IMAP](http://tools.ietf.org/html/rfc3501) client.
+An [EventMachine](http://rubyeventmachine.com/) based [IMAP](http://tools.ietf.org/html/rfc3501) client.
 
 ## Installation
 
