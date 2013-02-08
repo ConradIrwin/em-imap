@@ -61,12 +61,22 @@ module EventMachine
 
       ## 6.2 Client Commands - Not Authenticated State
 
-      # This would start tls negotiations, until this is implemented,
-      # simply pass true as the first parameter to EM::IMAP.connect.
+      # Run a STARTTLS handshake.
       #
+      # C: "STARTTLS\r\n"
+      # S: "OK go ahead\r\n"
+      # C: <tls handshake>
+      # S: <tls handshake>
+      #
+      # Succeeds with the OK response after the TLS handshake is complete.
       def starttls
-        raise NotImplementedError
+        tagged_response("STARTTLS").bind! do |response|
+          @connection.start_tls.transform{ response }
+        end
       end
+      # the IMAP command is STARTTLS, the eventmachine method is start_tls.
+      # Let's be nice to everyone and make both work.
+      alias_method :start_tls, :starttls
 
       # Authenticate using a custom authenticator.
       #

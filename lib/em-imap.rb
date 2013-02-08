@@ -11,6 +11,7 @@ require 'em-imap/continuation_synchronisation'
 require 'em-imap/formatter'
 require 'em-imap/command_sender'
 require 'em-imap/response_parser'
+require 'em-imap/deferrable_ssl'
 require 'em-imap/connection'
 
 require 'em-imap/authenticators'

@@ -7,6 +7,7 @@ module EventMachine
 
       include IMAP::CommandSender
       include IMAP::ResponseParser
+      include IMAP::DeferrableSSL
 
       # Create a new connection to an IMAP server.
       #
