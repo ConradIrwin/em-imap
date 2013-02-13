@@ -149,7 +149,17 @@ module EventMachine
     class Listener
       include ListeningDeferrable
       def initialize(&block)
+        @stopped = false
         listen &block if block_given?
+      end
+
+      def stop(*)
+        @stopped = true
+        super
+      end
+
+      def stopped?
+        @stopped
       end
     end
   end

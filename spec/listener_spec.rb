@@ -54,6 +54,12 @@ describe EM::IMAP::Listener do
     a.should == [2]
   end
 
+  it "should become stopped? when stopped" do
+    listener = EM::IMAP::Listener.new
+
+    lambda{ listener.stop }.should change{ listener.stopped? }.from(false).to(true)
+  end
+
   describe "transform" do
     before :each do
       @bottom = EM::IMAP::Listener.new
