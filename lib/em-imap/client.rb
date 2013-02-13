@@ -375,6 +375,79 @@ module EventMachine
         end
       end
 
+      # A Wrapper around the IDLE command that lets you wait until one email is received
+      #
+      # Returns a deferrable that succeeds when the IDLE command succeeds, or fails when
+      # the IDLE command fails.
+      #
+      # If a new email has arrived, the deferrable will succeed with the EXISTS response,
+      # otherwise it will succeed with nil.
+      #
+      # client.wait_for_one_email.bind! do |response|
+      #   process_new_email(response) if response
+      # end
+      #
+      # This method will be default wait for 29minutes as suggested by the IMAP spec.
+      #
+      # WARNING: just as with IDLE, no further commands can be sent over this connection
+      # until this deferrable has succeeded. You can stop it ahead of time if needed by
+      # calling stop on the returned deferrable.
+      #
+      # idler = client.wait_for_one_email.bind! do |response|
+      #   process_new_email(response) if response
+      # end
+      # idler.stop
+      #
+      # See also {wait_for_new_emails}
+      #
+      def wait_for_one_email(timeout=29 * 60)
+        exists_response = nil
+        idler = idle
+        EM::Timer.new(timeout) { idler.stop }
+        idler.listen do |response|
+          if Net::IMAP::UntaggedResponse === response && response.name =~ /\AEXISTS\z/i
+            exists_response = response
+            idler.stop
+          end
+        end.transform{ exists_response }
+      end
+
+      # Wait for new emails to arrive, and call the block when they do.
+      #
+      # This method will run until the upstream connection is closed,
+      # re-idling after every 29 minutes as implied by the IMAP spec.
+      # If you want to stop it, call .stop on the returned listener
+      #
+      # idler = client.wait_for_new_emails do |exists_response, &stop_waiting|
+      #   client.fetch(exists_response.data).bind! do |response|
+      #     puts response
+      #   end
+      # end
+      #
+      # idler.stop
+      #
+      # NOTE: the block should return a deferrable that succeeds when you
+      # are done processing the exists_response. At that point, the idler
+      # will be turned back on again.
+      #
+      def wait_for_new_emails(wrapper=Listener.new, &block)
+        wait_for_one_email.listen do |response|
+          wrapper.receive_event response
+        end.bind! do |response|
+          block.call response if response
+        end.bind! do
+          if wrapper.stopped?
+            wrapper.succeed
+          else
+            wait_for_new_emails(wrapper, &block)
+          end
+        end.errback do |*e|
+          wrapper.fail *e
+        end
+
+        wrapper
+      end
+
       def add_response_handler(&block)
         @connection.add_response_handler(&block)
       end
