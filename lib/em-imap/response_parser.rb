@@ -11,7 +11,7 @@ module EventMachine
 
       # This is a translation of Net::IMAP#get_response
       def receive_data(data)
-        @buffer += data
+        @buffer << data
 
         until @buffer.empty?
 
