@@ -17,6 +17,8 @@ Gem::Specification.new do |gem|
   gem.add_dependency 'deferrable_gratification'
 
   gem.add_development_dependency 'rspec'
+  gem.add_development_dependency "bundler"
+  gem.add_development_dependency "rake"
 
   gem.files = Dir[*%w(
       lib/em-imap.rb
