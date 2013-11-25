@@ -135,6 +135,21 @@ describe EM::IMAP::Client do
       end
     end
 
+    describe "authenticate" do
+      it "should convert auth strategy to uppercase string" do
+        @client.should_receive(:authenticator).
+          with('XOAUTH', { token: 'fake-token' })
+
+        @client.authenticate(:xoauth, {
+          token: 'fake-token'
+        })
+      end
+
+      it "should raise an exception if auth strategy does not exist" do
+        expect { @client.authenticate(:unknown_auth) }.to raise_error(/UNKNOWN_AUTH/)
+      end
+    end
+
     describe "logout" do
       before :each do
         @connection.should_receive(:send_data).with("RUBY0001 LOGIN conrad password\r\n")
