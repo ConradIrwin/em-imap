@@ -4,7 +4,7 @@ module EventMachine
   # for use in the authentication exchange.
   #
   module IMAP
-    def self.add_authenticator(klass)
+    def self.add_authenticator(*args)
       Net::IMAP.add_authenticator(*args)
     end
 

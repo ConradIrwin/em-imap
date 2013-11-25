@@ -91,7 +91,7 @@ module EventMachine
       def authenticate(auth_type, *args)
         # Extract these first so that any exceptions can be raised
         # before the command is created.
-        auth_type = auth_type.upcase
+        auth_type = auth_type.to_s.upcase
         auth_handler = authenticator(auth_type, *args)
 
         tagged_response('AUTHENTICATE', auth_type).tap do |command|
