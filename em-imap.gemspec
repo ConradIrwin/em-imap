@@ -1,6 +1,6 @@
 Gem::Specification.new do |gem|
   gem.name = 'em-imap'
-  gem.version = '0.4.1'
+  gem.version = '0.5'
 
   gem.summary = 'An EventMachine based IMAP client.'
   gem.description = "Allows you to connect to an IMAP4rev1 server in a non-blocking fashion."
