@@ -339,7 +339,7 @@ module EventMachine
       # The same as store, but keyed off UIDs instead of sequence numbers.
       #
       def uid_store(seq, name, value)
-        store_internal("UID", "STORE", seq, name, value)
+        store_internal("UID STORE", seq, name, value)
       end
 
       # Copy the specified messages to another mailbox.
