@@ -1,3 +1,9 @@
+## ⚠️⚠️⚠️ Insecure and unmaintained! ⚠️⚠️⚠️
+
+This gem should not be used, it is vulnerable to SSL man in the middle attacks as documented here: https://github.com/ConradIrwin/em-imap/issues/25. Pull requests for fixes are most welcome!
+
+----
+
 An [EventMachine](http://rubyeventmachine.com/) based [IMAP](http://tools.ietf.org/html/rfc3501) client.
 
 ## Installation
