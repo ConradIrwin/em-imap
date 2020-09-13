@@ -9,7 +9,7 @@ module EventMachine
       # finished
       #
       # TODO: expose certificates so they can be verified.
-      def start_tls
+      def start_tls(verify_peer)
         unless @ssl_deferrable
           @ssl_deferrable = DG::blank
           bothback{ @ssl_deferrable.fail }
