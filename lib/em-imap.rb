@@ -14,6 +14,7 @@ require 'em-imap/response_parser'
 require 'em-imap/deferrable_ssl'
 require 'em-imap/connection'
 
+require 'em-imap/ssl_verifier'
 require 'em-imap/authenticators'
 require 'em-imap/client'
 $:.shift

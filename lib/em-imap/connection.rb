@@ -20,9 +20,14 @@ module EventMachine
       #                     connection could not be established, or the
       #                     first response was BYE.
       #
+
+      attr_accessor :host
+
       def self.connect(host, port, ssl=false)
+        @host = host
         EventMachine.connect(host, port, self).tap do |conn|
-          conn.start_tls if ssl
+          conn.start_tls(:verify_peer => true) if ssl
+          conn.host = @host
         end
       end
 
